@@ -15,7 +15,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include "sdm845-pmic-overlay.dtsi"
 #include "sdm845-pinctrl-overlay.dtsi"
-#include "xiaomi-sde-display.dtsi"
+#include "sdm845-xiaomi-common.dtsi"
 #include "beryllium-p0-camera-sensor-mtp.dtsi"
 
 &qupv3_se10_i2c {
@@ -31,11 +31,11 @@
 };
 
 &reserved_memory {
-		ramdump_fb_mem: ramdump_fb_region@af000000 {
-			compatible = "removed-dma-pool";
-			no-map;
-			reg = <0 0xaf000000 0 0x1000000>;
-		};
+	ramdump_fb_mem: ramdump_fb_region@af000000 {
+		compatible = "removed-dma-pool";
+		no-map;
+		reg = <0 0xaf000000 0 0x1000000>;
+	};
 };
 
 &vendor {
@@ -179,29 +179,6 @@
 	qcom,ovp-mv = <29600>;
 	qcom,en-cabc;
 	qcom,switch-freq-khz = <600>;
-};
-
-&red_led {
-	linux,name = "white";
-	qcom,start-idx = <1>;
-	qcom,idx-len = <11>;
-	qcom,duty-pcts = [00 05 0a 0f 14 1d 28 32 3c 4b 64];
-	qcom,duty-ms = <20>;
-	qcom,lut-flags = <0x1f>;
-	qcom,ramp-step-ms = <100>;
-	qcom,pause-lo = <2000>;
-	qcom,pause-hi = <1000>;
-	qcom,ramp-step-ms = <100>;
-	qcom,use-blink;
-	status = "okay";
-};
-
-&green_led {
-	status = "disabled";
-};
-
-&blue_led {
-	status = "disabled";
 };
 
 &sde_dp {
@@ -417,12 +394,11 @@
 		interrupt-names = "nfc_irq";
 		pinctrl-names = "nfc_active", "nfc_suspend";
 		pinctrl-0 = <&nfc_int_active
-				        &nfc_enable_active
-				        &nfc_clk_default>;
+			     &nfc_enable_active
+			     &nfc_clk_default>;
 		pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend>;
 		clocks = <&clock_rpmh RPMH_LN_BB_CLK3>;
 		clock-names = "ref_clk";
-		status = "disabled";
 	};
 };
 
@@ -669,7 +645,6 @@
 		qcom,hw-settle-time = <2>;
 		qcom,fast-avg-setup = <0>;
 	};
-
 };
 
 &pm8998_adc_tm {
@@ -756,11 +731,10 @@
 		polling-delay = <0>;
 		thermal-sensors = <&pm8998_adc_tm 0x4c>;
 		thermal-governor = "user_space";
-		wake-capable-sensor;
 
 		trips {
 			active-config0 {
-				temperature = <125000>;
+				temperature = <65000>;
 				hysteresis = <1000>;
 				type = "passive";
 			};
@@ -776,9 +750,9 @@
 
 		trips {
 			active-config0 {
-					temperature = <125000>;
-					hysteresis = <1000>;
-					type = "passive";
+				temperature = <125000>;
+				hysteresis = <1000>;
+				type = "passive";
 			};
 		};
 	};
@@ -790,10 +764,10 @@
 		thermal-governor = "user_space";
 		wake-capable-sensor;
 		disable-thermal-zone;
-		
+
 		trips {
 			active-config0 {
-					temperature = <125000>;
+					temperature = <65000>;
 					hysteresis = <1000>;
 					type = "passive";
 			};
@@ -857,10 +831,10 @@
 		thermal-governor = "user_space";
 		wake-capable-sensor;
 		disable-thermal-zone;
-		
+
 		trips {
 			active-config0 {
-					temperature = <125000>;
+					temperature = <65000>;
 					hysteresis = <1000>;
 					type = "passive";
 			};
@@ -880,15 +854,10 @@
 
 		trips {
 			active-config0 {
-					temperature = <125000>;
+					temperature = <65000>;
 					hysteresis = <1000>;
 					type = "passive";
 			};
-			shutdown-config {
-				temperature = <59000>;
-				hysteresis = <1000>;
-				type = "critical";
-			}
 		};
 	};
 
@@ -897,13 +866,12 @@
 		polling-delay = <0>;
 		thermal-sensors = <&pm8998_adc_tm 0x51>;
 		thermal-governor = "user_space";
-		wake-capable-sensor;
 
 		trips {
 			active-config0 {
-				temperature = <125000>;
-				hysteresis = <1000>;
-				type = "passive";
+					temperature = <65000>;
+					hysteresis = <1000>;
+					type = "passive";
 			};
 		};
 	};
@@ -913,17 +881,16 @@
 		polling-delay = <0>;
 		thermal-sensors = <&pm8998_adc_tm 0x50>;
 		thermal-governor = "user_space";
-		wake-capable-sensor;
 
 		trips {
 			active-config0 {
-				temperature = <125000>;
+				temperature = <65000>;
 				hysteresis = <1000>;
 				type = "passive";
 			};
 		};
 	};
-	
+
 	usbc-therm-monitor {
 		polling-delay-passive = <0>;
 		polling-delay = <0>;
@@ -932,12 +899,13 @@
 
 		trips {
 			active-config0 {
-				temperature = <125000>;
+				temperature = <65000>;
 				hysteresis = <1000>;
 				type = "passive";
 			};
 		};
 	};
+};
 
 &usb0 {
 	dwc3@a600000 {
