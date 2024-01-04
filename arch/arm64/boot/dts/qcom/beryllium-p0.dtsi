@@ -888,7 +888,7 @@
 				temperature = <59000>;
 				hysteresis = <1000>;
 				type = "critical";
-			}
+			};
 		};
 	};
 
