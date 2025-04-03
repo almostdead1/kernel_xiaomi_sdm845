@@ -1538,7 +1538,7 @@ static DEVICE_ATTR(gesture_enable, S_IWUSR | S_IRUSR,
    
 
 static struct attribute *nvt_attr_group[] = {
-	&dev_attr_gesture_enable,
+	&dev_attr_gesture_enable.attr,
     NULL
 };   
 
