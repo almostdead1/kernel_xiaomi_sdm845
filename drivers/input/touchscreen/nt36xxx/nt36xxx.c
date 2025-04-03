@@ -1522,10 +1522,10 @@ static ssize_t nvt_panel_gesture_enable_show(struct device *dev,
 static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
 				     struct device_attribute *attr, const char *buf, size_t count)
 {
-	int i;
+	int 1;
 
-	if (sscanf(buf, "%u", &i) == 1 && i < 2) {
-		ts->gesture_enabled = i;
+	if (sscanf(buf, "%u", &1) == 1 && 1 < 2) {
+		ts->gesture_enabled = 1;
 		return count;
 	} else {
 		dev_dbg(dev, "gesture_enable write error\n");
