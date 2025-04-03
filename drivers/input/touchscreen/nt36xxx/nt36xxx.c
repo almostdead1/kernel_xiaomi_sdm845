@@ -1592,9 +1592,6 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 		return -ENOMEM;
 	}
 
-    msleep(500);
-    ts->gesture_enabled = 1;
-
 	ts->client = client;
 	ts->input_proc = NULL; 
 	i2c_set_clientdata(client, ts);
