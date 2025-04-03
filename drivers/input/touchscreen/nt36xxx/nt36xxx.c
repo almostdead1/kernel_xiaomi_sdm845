@@ -1814,9 +1814,6 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 
 	nvt_irq_enable(true);
 
-    // Enable DT2W by default
-    ts->gesture_enabled = 1;
-
 	return 0;
 
 #if defined(CONFIG_DRM)
