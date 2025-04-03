@@ -1525,7 +1525,7 @@ static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
 	int i;
 
 	if (sscanf(buf, "%u", &i) == 1 && i < 2) {
-		ts->gesture_enabled = i;
+		ts->gesture_enabled = 1;
 		return count;
 	} else {
 		dev_dbg(dev, "enable_dt2w write error\n");
