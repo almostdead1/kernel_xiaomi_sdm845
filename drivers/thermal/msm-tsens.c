@@ -23,6 +23,10 @@
 #include "tsens.h"
 #include "qcom/qti_virtual_sensor.h"
 
+#ifdef CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
+#endif
+
 LIST_HEAD(tsens_device_list);
 
 static int tsens_get_temp(void *data, int *temp)
@@ -202,6 +206,10 @@ static int tsens_thermal_zone_register(struct tsens_device *tmdev)
 				sensor_missing++;
 				continue;
 			}
+			/* cache sensor tzd to houston */
+#ifdef CONFIG_HOUSTON
+			ht_register_thermal_zone_device(tmdev->sensor[i].tzd);
+#endif
 		} else {
 			pr_debug("Sensor not enabled:%d\n", i);
 		}
