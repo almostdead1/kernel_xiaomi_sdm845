@@ -1831,8 +1831,7 @@ static int op_sla_set_game_start_state(struct nlmsghdr *nlh)
 	return	0;
 }
 
-static int sla_netlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
-			       struct netlink_ext_ack *extack)
+static int sla_netlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	int ret = 0;
 
