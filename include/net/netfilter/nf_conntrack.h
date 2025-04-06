@@ -20,6 +20,7 @@
 #include <linux/rhashtable.h>
 #include <linux/list.h>
 
+#include <linux/netfilter/nf_conntrack_dns.h>
 #include <linux/netfilter/nf_conntrack_tcp.h>
 #include <linux/netfilter/nf_conntrack_dccp.h>
 #include <linux/netfilter/nf_conntrack_sctp.h>
@@ -43,6 +44,7 @@ union nf_conntrack_proto {
 	struct ip_ct_sctp sctp;
 	struct ip_ct_tcp tcp;
 	struct nf_ct_gre gre;
+	struct nf_ct_dns dns;
 };
 
 union nf_conntrack_expect_proto {
