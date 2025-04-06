@@ -343,6 +343,7 @@ struct sock {
 #define sk_incoming_cpu		__sk_common.skc_incoming_cpu
 #define sk_flags		__sk_common.skc_flags
 #define sk_rxhash		__sk_common.skc_rxhash
+#define op_sla_mark		__sk_common.skc_op_mark
 
 	socket_lock_t		sk_lock;
 	atomic_t		sk_drops;
