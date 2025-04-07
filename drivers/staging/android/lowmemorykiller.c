@@ -800,6 +800,8 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 			current->comm, current->pid,
 			cache_size, cache_limit,
 			min_score_adj,
+/* bin.zhong@ASTI add for CONFIG_SMART_BOOST */
+			UID_LRU_SIZE,
 			free,
 			global_page_state(NR_FREE_CMA_PAGES) *
 			(long)(PAGE_SIZE / 1024),
