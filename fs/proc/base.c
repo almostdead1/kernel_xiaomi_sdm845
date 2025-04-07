@@ -89,6 +89,9 @@
 #include <linux/flex_array.h>
 #include <linux/posix-timers.h>
 #include <linux/cpufreq_times.h>
+
+#include <linux/adj_chain.h>
+
 #ifdef CONFIG_HARDWALL
 #include <asm/hardwall.h>
 #endif
@@ -1229,7 +1232,30 @@ static ssize_t oom_adj_write(struct file *file, const char __user *buf,
 	else
 		oom_adj = (oom_adj * OOM_SCORE_ADJ_MAX) / -OOM_DISABLE;
 
-	err = __set_oom_adj(file, oom_adj, true);
+	mutex_lock(&oom_adj_mutex);
+	if (oom_adj < task->signal->oom_score_adj &&
+		!capable(CAP_SYS_RESOURCE)) {
+		err = -EACCES;
+		goto err_unlock;
+	}
+
+	/*
+	 * /proc/pid/oom_adj is provided for legacy purposes, ask users to use
+	 * /proc/pid/oom_score_adj instead.
+	 */
+	pr_warn_once("%s (%d): /proc/%d/oom_adj is deprecated, please use /proc/%d/oom_score_adj instead.\n",
+		  current->comm, task_pid_nr(current), task_pid_nr(task),
+		  task_pid_nr(task));
+
+	task->signal->oom_score_adj = oom_adj;
+
+	adj_chain_update_oom_score_adj(task);
+
+	trace_oom_score_adj_update(task);
+err_unlock:
+	mutex_unlock(&oom_adj_mutex);
+	put_task_struct(task);
+
 out:
 	return err < 0 ? err : count;
 }
@@ -1280,7 +1306,35 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 		goto out;
 	}
 
-	err = __set_oom_adj(file, oom_score_adj, false);
+	task = get_proc_task(file_inode(file));
+	if (!task) {
+		err = -ESRCH;
+		goto out;
+	}
+
+	mutex_lock(&oom_adj_mutex);
+	if ((short)oom_score_adj < task->signal->oom_score_adj_min &&
+			!capable(CAP_SYS_RESOURCE)) {
+		err = -EACCES;
+		goto err_unlock;
+	}
+
+	/* CONFIG_MEMPLUS add start by bin.zhong@ATSI */
+	/* memplus_state_check(false, oom_score_adj, task, 0, 0); */
+	/* add end */
+	task->signal->oom_score_adj = (short)oom_score_adj;
+
+	adj_chain_update_oom_score_adj(task);
+
+	if (has_capability_noaudit(current, CAP_SYS_RESOURCE))
+		task->signal->oom_score_adj_min = (short)oom_score_adj;
+
+	trace_oom_score_adj_update(task);
+
+err_unlock:
+	mutex_unlock(&oom_adj_mutex);
+	put_task_struct(task);
+
 out:
 	return err < 0 ? err : count;
 }
