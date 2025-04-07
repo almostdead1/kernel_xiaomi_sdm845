@@ -98,6 +98,11 @@ static struct shrink_control lowmem_notif_sc = {GFP_KERNEL, 0};
 static int lowmem_minfree_notif_trigger;
 static struct kobject *lowmem_notify_kobj;
 #endif
+/*  bin.zhong@ASTI add for CONFIG_SMART_BOOST */
+unsigned long get_max_minfree(void)
+{
+	return (unsigned long)lowmem_minfree[lowmem_minfree_size - 1];
+}
 
 #define lowmem_print(level, x...)			\
 	do {						\
@@ -781,6 +786,8 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		lowmem_print(1, "Killing '%s' (%d) (tgid %d), adj %hd,\n"
 			"to free %ldkB on behalf of '%s' (%d) because\n"
 			"cache %ldkB is below limit %ldkB for oom score %hd\n"
+/* bin.zhong@ASTI add for CONFIG_SMART_BOOST */
+			"uid_lru_list size %ld pages\n"
 			"Free memory is %ldkB above reserved.\n"
 			"Free CMA is %ldkB\n"
 			"Total reserve is %ldkB\n"
