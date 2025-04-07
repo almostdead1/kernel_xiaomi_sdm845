@@ -1367,6 +1367,73 @@ unsigned long reclaim_clean_pages_from_list(struct zone *zone,
 	return ret;
 }
 
+/* bin.zhong@ASTI add for CONFIG_MEMPLUS or CONFIG_SMART_BOOST*/
+unsigned long coretech_reclaim_pagelist(struct list_head *page_list,
+	struct vm_area_struct *vma, void *sc)
+{
+	unsigned long dummy1, dummy2, dummy3, dummy4, dummy5;
+	struct scan_control sc_t = {
+		.gfp_mask = GFP_KERNEL,
+		.priority = DEF_PRIORITY,
+		.may_writepage = 1,
+		.may_unmap = 1,
+		.may_swap = 1,
+		.target_vma = vma,
+	};
+
+	unsigned long nr_reclaimed;
+	struct page *page;
+
+	if (!sc)
+		sc = &sc_t;
+
+	list_for_each_entry(page, page_list, lru) {
+		ClearPageActive(page);
+	}
+
+	nr_reclaimed = shrink_page_list(page_list, NULL,
+		(struct scan_control *)sc,
+		TTU_IGNORE_ACCESS, &dummy1, &dummy2, &dummy3,
+		&dummy4, &dummy5, true);
+
+	while (!list_empty(page_list)) {
+		page = lru_to_page(page_list);
+		list_del(&page->lru);
+		dec_node_page_state(page, NR_ISOLATED_ANON +
+			page_is_file_cache(page));
+		putback_lru_page(page);
+	}
+
+	return nr_reclaimed;
+}
+
+/* bin.zhong@ASTI add for CONFIG_SMART_BOOST */
+static void smart_boost_reclaim_pages(struct lruvec *lruvec,
+					struct pglist_data *pgdat,
+					struct scan_control *sc)
+{
+	LIST_HEAD(page_list);
+	unsigned long nr_isolate = 0;
+	struct page *page;
+	unsigned long dummy1, dummy2, dummy3, dummy4, dummy5;
+
+	nr_isolate = smb_isolate_list_or_putbcak(&page_list,
+		lruvec, pgdat, sc->priority,
+		(sc->nr_reclaimed > sc->nr_to_reclaim));
+	if (!nr_isolate)
+		return;
+
+	sc->nr_reclaimed += shrink_page_list(&page_list, pgdat, sc,
+			TTU_IGNORE_ACCESS, &dummy1, &dummy2, &dummy3,
+			&dummy4, &dummy5, true);
+
+	while (!list_empty(&page_list)) {
+		page = lru_to_page(&page_list);
+		list_del(&page->lru);
+		putback_lru_page(page);
+	}
+}
+
 #ifdef CONFIG_PROCESS_RECLAIM
 unsigned long reclaim_pages_from_list(struct list_head *page_list,
 					struct vm_area_struct *vma)
@@ -2119,6 +2186,8 @@ static void shrink_active_list(unsigned long nr_to_scan,
 
 	mem_cgroup_uncharge_list(&l_hold);
 	free_hot_cold_page_list(&l_hold, true);
+	/* bin.zhong@ASTI add for CONFIG_SMART_BOOST */
+	smart_boost_reclaim_pages(lruvec, pgdat, sc);
 }
 
 /*

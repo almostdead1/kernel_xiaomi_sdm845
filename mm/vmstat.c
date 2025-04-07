@@ -945,6 +945,9 @@ const char * const vmstat_text[] = {
 	"numa_local",
 	"numa_other",
 #endif
+#ifdef CONFIG_SMART_BOOST
+	"nr_uid_lru",
+#endif
 	"nr_free_cma",
 
 	/* Node-based counters */

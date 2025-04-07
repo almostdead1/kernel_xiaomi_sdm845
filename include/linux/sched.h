@@ -2241,6 +2241,11 @@ struct task_struct {
 	/* A live task holds one reference. */
 	atomic_t stack_refcount;
 #endif
+
+#ifdef CONFIG_SMART_BOOST
+	int hot_count;
+#endif
+
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*
