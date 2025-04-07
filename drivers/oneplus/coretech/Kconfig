@@ -3,3 +3,9 @@ config HOUSTON
 	bool "houston rocket play your temperature guard"
 	help
 	 Realtime temperature monitor
+
+config SMART_BOOST
+        bool "support smart boost feature"
+        default n
+        help
+         Smart Boost feature
