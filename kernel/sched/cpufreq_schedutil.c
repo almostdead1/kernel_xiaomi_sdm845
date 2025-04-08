@@ -477,7 +477,6 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	bool busy;
 
 	flags &= ~SCHED_CPUFREQ_RT_DL;
-	cb_update(sg_policy->policy, time);
 
 	if (!sg_policy->tunables->pl && flags & SCHED_CPUFREQ_PL)
 		return;
@@ -576,7 +575,6 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 	unsigned long util, max, hs_util;
 	unsigned int next_f;
 
-	cb_update(sg_policy->policy, time);
 	if (!sg_policy->tunables->pl && flags & SCHED_CPUFREQ_PL)
 		return;
 
