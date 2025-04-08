@@ -15,3 +15,7 @@ config SMART_BOOST
         default n
         help
          Smart Boost feature
+
+config OPLUS_FEATURE_SUGOV_TL
+	default n
+	bool "A power optimization feature target loads"
