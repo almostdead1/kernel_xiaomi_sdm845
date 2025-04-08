@@ -2247,6 +2247,14 @@ struct task_struct {
 	/* A live task holds one reference. */
 	atomic_t stack_refcount;
 #endif
+	/* Curtis, 20180109, opchain*/
+	u64 utask_tag;
+	u64 utask_tag_base;
+	int etask_claim;
+	int claim_cpu;
+	bool utask_slave;
+	/* Ted, 20180425, non-exist dcache*/
+	struct nedf_node *nn;
 
 #ifdef CONFIG_SMART_BOOST
 	int hot_count;
