@@ -67,7 +67,6 @@ extern void Boot_Update_Firmware(struct work_struct *work);
 static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
 #endif
 
-#define PROC_SYMLINK_PATH "touchpanel"
 
 #if TOUCH_KEY_NUM > 0
 const uint16_t touch_key_array[TOUCH_KEY_NUM] = {
@@ -1537,32 +1536,61 @@ static struct attribute *nvt_attr_group[] = {
     NULL
 };   
 
+#define PAGESIZE 512
 
-static ssize_t novatek_input_symlink(struct nvt_ts_data *ts) {
-	char *driver_path;
-	int ret = 0;
-	if (ts->input_proc) {
-		proc_remove(ts->input_proc);
-		ts->input_proc = NULL;
-	}
-	driver_path = kzalloc(PATH_MAX, GFP_KERNEL);
-	if (!driver_path) {
-		pr_err("%s: failed to allocate memory\n", __func__);
-		return -ENOMEM;
-	}
+static int double_tap_state = 0;
 
-	sprintf(driver_path, "/sys%s",
-			kobject_get_path(&ts->client->dev.kobj, GFP_KERNEL));
+#define GESTURE_ATTR(name)\
+    static ssize_t name##_enable_read_func(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)\
+    {\
+        int ret = 0;\
+        char page[PAGESIZE];\
+        ret = sprintf(page, "%d\n", name##_state);\
+        ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));\
+        return ret;\
+    }\
+    static ssize_t name##_enable_write_func(struct file *file, const char __user *user_buf, size_t count, loff_t *ppos)\
+    {\
+        int ret = 0;\
+        char page[PAGESIZE] = {0};\
+        ret = copy_from_user(page, user_buf, count);\
+        ret = sscanf(page, "%d", &name##_state);\
+        return count;\
+    }\
+    static const struct file_operations name##_enable_proc_fops = {\
+        .write = name##_enable_write_func,\
+        .read =  name##_enable_read_func,\
+        .open = simple_open,\
+        .owner = THIS_MODULE,\
+    };
 
-	pr_err("%s: driver_path=%s\n", __func__, driver_path);
+GESTURE_ATTR(double_tap);
 
-	ts->input_proc = proc_symlink(PROC_SYMLINK_PATH, NULL, driver_path);
+#define CREATE_PROC_NODE(PARENT, NAME, MODE)\
+    node = proc_create(#NAME, MODE, PARENT, &NAME##_proc_fops);\
+    if (node == NULL) {\
+        ret = -ENOMEM;\
+        NVT_LOG("[Nvt-ts] : Couldn't create " #NAME " in " #PARENT "\n");\
+    }
 
-	if (!ts->input_proc) {
-		ret = -ENOMEM;
-	}
-	kfree(driver_path);
-	return ret;
+#define CREATE_GESTURE_NODE(NAME)\
+    CREATE_PROC_NODE(touchpanel, NAME##_enable, 0664)
+
+int nvt_gesture_proc_init(void) {
+    int ret = 0;
+    struct proc_dir_entry *touchpanel = NULL;
+    struct proc_dir_entry *node  = NULL;
+
+    touchpanel = proc_mkdir("touchpanel", NULL);
+
+    if (touchpanel == NULL) {
+        ret = -ENOMEM;
+        NVT_LOG("[Nvt-ts] : Couldn't create proc/touchpanel \n");
+    }
+    
+    CREATE_GESTURE_NODE(double_tap);
+    
+    return ret;
 }
 
 /*******************************************************
@@ -1588,7 +1616,6 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	}
 
 	ts->client = client;
-	ts->input_proc = NULL; 
 	i2c_set_clientdata(client, ts);
 
 	//---parse dts---
@@ -1794,16 +1821,6 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	}
 #endif
 
-	ts->attrs.attrs = nvt_attr_group;
-	ret = sysfs_create_group(&client->dev.kobj, &ts->attrs);
-	if (ret) {
-		NVT_ERR("Cannot create sysfs structure!\n");
-	} 
-	ret = novatek_input_symlink(ts);
-	if (ret < 0) {
-		NVT_ERR("Failed to symlink input device!\n");
-	}
- 
 	bTouchIsAwake = 1;
 	NVT_LOG("end\n");
 
