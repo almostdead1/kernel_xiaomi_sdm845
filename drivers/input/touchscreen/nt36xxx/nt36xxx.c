@@ -67,7 +67,6 @@ extern void Boot_Update_Firmware(struct work_struct *work);
 static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
 #endif
 
-
 #if TOUCH_KEY_NUM > 0
 const uint16_t touch_key_array[TOUCH_KEY_NUM] = {
 	KEY_BACK,
@@ -1511,87 +1510,36 @@ err_pinctrl_get:
 	return retval;
 }
 
-static ssize_t nvt_panel_gesture_enable_show(struct device *dev,
+static ssize_t nvt_panel_wake_gesture_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
         const char c = ts->gesture_enabled ? '1' : '0';
         return sprintf(buf, "%c\n", c);
 }
 
-static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
+static ssize_t nvt_panel_wake_gesture_store(struct device *dev,
 				     struct device_attribute *attr, const char *buf, size_t count)
 {
+	int i;
 
-		ts->gesture_enabled = 1;
+	if (sscanf(buf, "%u", &i) == 1 && i < 2) {
+		ts->gesture_enabled = i;
 		return count;
-
+	} else {
+		dev_dbg(dev, "enable_dt2w write error\n");
+		return -EINVAL;
+	}
 }
 
-static DEVICE_ATTR(gesture_enable, S_IWUSR | S_IRUSR,
-		nvt_panel_gesture_enable_show, nvt_panel_gesture_enable_store);
+static DEVICE_ATTR(wake_gesture, S_IWUSR | S_IRUSR,
+		nvt_panel_wake_gesture_show, nvt_panel_wake_gesture_store);
    
 
 static struct attribute *nvt_attr_group[] = {
-	&dev_attr_gesture_enable.attr,
+	&dev_attr_wake_gesture.attr,
     NULL
 };   
 
-#define PAGESIZE 512
-
-static int double_tap_state = 0;
-
-#define GESTURE_ATTR(name)\
-    static ssize_t name##_enable_read_func(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)\
-    {\
-        int ret = 0;\
-        char page[PAGESIZE];\
-        ret = sprintf(page, "%d\n", name##_state);\
-        ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));\
-        return ret;\
-    }\
-    static ssize_t name##_enable_write_func(struct file *file, const char __user *user_buf, size_t count, loff_t *ppos)\
-    {\
-        int ret = 0;\
-        char page[PAGESIZE] = {0};\
-        ret = copy_from_user(page, user_buf, count);\
-        ret = sscanf(page, "%d", &name##_state);\
-        return count;\
-    }\
-    static const struct file_operations name##_enable_proc_fops = {\
-        .write = name##_enable_write_func,\
-        .read =  name##_enable_read_func,\
-        .open = simple_open,\
-        .owner = THIS_MODULE,\
-    };
-
-GESTURE_ATTR(double_tap);
-
-#define CREATE_PROC_NODE(PARENT, NAME, MODE)\
-    node = proc_create(#NAME, MODE, PARENT, &NAME##_proc_fops);\
-    if (node == NULL) {\
-        ret = -ENOMEM;\
-        NVT_LOG("[Nvt-ts] : Couldn't create " #NAME " in " #PARENT "\n");\
-    }
-
-#define CREATE_GESTURE_NODE(NAME)\
-    CREATE_PROC_NODE(touchpanel, NAME##_enable, 0664)
-
-int nvt_gesture_proc_init(void) {
-    int ret = 0;
-    struct proc_dir_entry *touchpanel = NULL;
-    struct proc_dir_entry *node  = NULL;
-
-    touchpanel = proc_mkdir("touchpanel", NULL);
-
-    if (touchpanel == NULL) {
-        ret = -ENOMEM;
-        NVT_LOG("[Nvt-ts] : Couldn't create proc/touchpanel \n");
-    }
-    
-    CREATE_GESTURE_NODE(double_tap);
-    
-    return ret;
-}
 
 /*******************************************************
 Description:
