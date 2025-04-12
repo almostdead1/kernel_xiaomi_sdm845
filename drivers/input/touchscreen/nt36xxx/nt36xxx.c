@@ -1518,28 +1518,30 @@ static ssize_t nvt_panel_gesture_enable_show(struct device *dev,
 	struct nvt_ts_data *ts = dev_get_drvdata(dev);
 	if (!ts)
 		return -ENODEV;
-	return sprintf(buf, "0x%x\n", ts->gesture_enable); // Format as hexadecimal
+
+	if (ts->gesture_enable) { // If non-zero, consider enabled
+		return sprintf(buf, "0x80\n");
+	} else {
+		return sprintf(buf, "0x0\n");
+	}
 }
 
 static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
 				     struct device_attribute *attr, const char *buf, size_t count)
 {
 	struct nvt_ts_data *ts = dev_get_drvdata(dev);
-	unsigned int value; // Use unsigned int to store the hex value
+	unsigned int value;
 	int ret;
 
 	if (!ts)
 		return -ENODEV;
 
-	// Attempt to parse the input as a hexadecimal number
-	ret = kstrtouint(buf, 16, &value); // Base 16 for hexadecimal
-	if (ret == 0) {
-		// Now you have the hexadecimal value in the 'value' variable
-		// You can use this value to update your driver's state
-		ts->gesture_enable = value; // Assuming gesture_enable can hold this value
+	ret = kstrtouint(buf, 0, &value); // Auto-detect base (handles decimal 0/1)
+	if (ret == 0 && value < 2) {
+		ts->gesture_enable = value ? 0x80 : 0x0; // Set underlying hex value
 		return count;
 	} else {
-		dev_dbg(dev, "gesture_enable write error: invalid hexadecimal input\n");
+		dev_dbg(dev, "gesture_enable write error: invalid input (expecting 0 or 1)\n");
 		return -EINVAL;
 	}
 }
