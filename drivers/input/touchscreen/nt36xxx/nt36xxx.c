@@ -1533,7 +1533,7 @@ static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
 	}
 }
 
-static DEVICE_ATTR(gesture_enable, 0666,
+static DEVICE_ATTR(gesture_enable, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH,
 		nvt_panel_gesture_enable_show, nvt_panel_gesture_enable_store);
    
 
