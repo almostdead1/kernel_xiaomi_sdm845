@@ -1534,17 +1534,22 @@ static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
 }
 
 static struct device_attribute dev_attr_gesture_enable = {
-        .attr.name  = "gesture_enable",
-        .attr.mode  = 0666,
-        .show       = gesture_enable_show,
-        .store      = gesture_enable_store,
-};   
+    .attr = {
+        .name = "gesture_enable",
+        .mode = 0666, // Explicitly set the permissions
+    },
+    .show = gesture_enable_show,
+    .store = gesture_enable_store,
+};
 
-static struct attribute *nvt_attr_group[] = {
-	&dev_attr_gesture_enable.attr,
-    NULL
-};   
+static struct attribute *nvt_attrs[] = {
+    &dev_attr_gesture_enable.attr,
+    NULL, // Null-terminate the list
+};
 
+static struct attribute_group nvt_attr_group = {
+    .attrs = nvt_attrs,
+};
 
 static ssize_t novatek_input_symlink(struct nvt_ts_data *ts) {
 	char *driver_path;
