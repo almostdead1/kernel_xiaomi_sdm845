@@ -1533,9 +1533,12 @@ static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
 	}
 }
 
-static DEVICE_ATTR(gesture_enable, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH,
-		nvt_panel_gesture_enable_show, nvt_panel_gesture_enable_store);
-   
+static struct device_attribute dev_attr_gesture_enable = {
+        .attr.name  = "gesture_enable",
+        .attr.mode  = 0666,
+        .show       = gesture_enable_show,
+        .store      = gesture_enable_store,
+};   
 
 static struct attribute *nvt_attr_group[] = {
 	&dev_attr_gesture_enable.attr,
