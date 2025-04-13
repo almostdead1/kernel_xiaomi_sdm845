@@ -1591,9 +1591,9 @@ static ssize_t gesture_enable_write_func(struct file *file, const char __user *u
 
 // File operations for gesture_enable
 static const struct file_operations gesture_enable_proc_fops = {
-    .proc_read = gesture_enable_read_func,
-    .proc_write = gesture_enable_write_func,
-    .proc_open = simple_open,
+    .read = gesture_enable_read_func,
+    .write = gesture_enable_write_func,
+    .open = simple_open,
 };
 
 // Module initialization function
