@@ -27,6 +27,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/hwinfo.h>
 
+#include <linux/init.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
+
 #ifdef CONFIG_DRM
 #include <drm/drm_notifier.h>
 #include <drm/drm_panel.h>
@@ -67,7 +71,9 @@ extern void Boot_Update_Firmware(struct work_struct *work);
 static int nvt_drm_notifier_callback(struct notifier_block *self, unsigned long event, void *data);
 #endif
 
-#define PROC_SYMLINK_PATH "touchpanel"
+#define PROC_DIR_NAME "touchpanel"
+#define PROC_FILE_NAME "gesture_enable"
+#define PROC_FILE_PERMISSIONS 0666
 
 #if TOUCH_KEY_NUM > 0
 const uint16_t touch_key_array[TOUCH_KEY_NUM] = {
@@ -1512,75 +1518,71 @@ err_pinctrl_get:
 	return retval;
 }
 
-static ssize_t nvt_panel_gesture_enable_show(struct device *dev,
+static ssize_t nvt_panel_wake_gesture_show(struct device *dev,
 				     struct device_attribute *attr, char *buf)
 {
-	struct nvt_ts_data *ts = dev_get_drvdata(dev);
-	if (!ts)
-		return -ENODEV;
-
-	if (ts->gesture_enable) { // If non-zero, consider enabled
-		return sprintf(buf, "0x80\n");
-	} else {
-		return sprintf(buf, "0x0\n");
-	}
+        const char c = ts->gesture_enabled ? '1' : '0';
+        return sprintf(buf, "%c\n", c);
 }
 
-static ssize_t nvt_panel_gesture_enable_store(struct device *dev,
+static ssize_t nvt_panel_wake_gesture_store(struct device *dev,
 				     struct device_attribute *attr, const char *buf, size_t count)
 {
-	struct nvt_ts_data *ts = dev_get_drvdata(dev);
-	unsigned int value;
-	int ret;
+	int i;
 
-	if (!ts)
-		return -ENODEV;
-
-	ret = kstrtouint(buf, 0, &value); // Auto-detect base (handles decimal 0/1)
-	if (ret == 0 && value < 2) {
-		ts->gesture_enable = value ? 0x80 : 0x0; // Set underlying hex value
+	if (sscanf(buf, "%u", &i) == 1 && i < 2) {
+		ts->gesture_enabled = i;
 		return count;
 	} else {
-		dev_dbg(dev, "gesture_enable write error: invalid input (expecting 0 or 1)\n");
+		dev_dbg(dev, "enable_dt2w write error\n");
 		return -EINVAL;
 	}
 }
 
-static DEVICE_ATTR(gesture_enable, S_IWUSR | S_IRUSR,
-		nvt_panel_gesture_enable_show, nvt_panel_gesture_enable_store);
+static DEVICE_ATTR(wake_gesture, S_IWUSR | S_IRUSR,
+		nvt_panel_wake_gesture_show, nvt_panel_wake_gesture_store);
    
 
 static struct attribute *nvt_attr_group[] = {
-	&dev_attr_gesture_enable.attr,
+	&dev_attr_wake_gesture.attr,
     NULL
 };
 
-static ssize_t novatek_input_symlink(struct nvt_ts_data *ts) {
-	char *driver_path;
-	int ret = 0;
-	if (ts->input_proc) {
-		proc_remove(ts->input_proc);
-		ts->input_proc = NULL;
-	}
-	driver_path = kzalloc(PATH_MAX, GFP_KERNEL);
-	if (!driver_path) {
-		pr_err("%s: failed to allocate memory\n", __func__);
-		return -ENOMEM;
-	}
 
-	sprintf(driver_path, "/sys%s",
-			kobject_get_path(&ts->client->dev.kobj, GFP_KERNEL));
+static int __init nvt_gesture_proc_init(void)
+{
+    struct proc_dir_entry *touchpanel_dir;
+    struct proc_dir_entry *gesture_enable_file;
 
-	pr_err("%s: driver_path=%s\n", __func__, driver_path);
+    // Create /proc/touchpanel directory
+    touchpanel_dir = proc_mkdir(PROC_DIR_NAME, NULL);
+    if (!touchpanel_dir) {
+        pr_err("Failed to create /proc/%s directory\n", PROC_DIR_NAME);
+        return -ENOMEM;
+    }
 
-	ts->input_proc = proc_symlink(PROC_SYMLINK_PATH, NULL, driver_path);
+    // Create /proc/touchpanel/gesture_enable file
+    gesture_enable_file = proc_create(PROC_FILE_NAME, PROC_FILE_PERMISSIONS, touchpanel_dir, NULL);
+    if (!gesture_enable_file) {
+        pr_err("Failed to create /proc/%s/%s file\n", PROC_DIR_NAME, PROC_FILE_NAME);
+        remove_proc_entry(PROC_DIR_NAME, NULL);
+        return -ENOMEM;
+    }
 
-	if (!ts->input_proc) {
-		ret = -ENOMEM;
-	}
-	kfree(driver_path);
-	return ret;
+    pr_info("/proc/%s/%s created with permissions 0%o\n", PROC_DIR_NAME, PROC_FILE_NAME, PROC_FILE_PERMISSIONS);
+
+    return 0;
 }
+
+static void __exit nvt_gesture_proc_exit(void)
+{
+    // Remove proc entries
+    remove_proc_entry(PROC_FILE_NAME, proc_mkdir(PROC_DIR_NAME, NULL));
+    remove_proc_entry(PROC_DIR_NAME, NULL);
+
+    pr_info("/proc/%s/%s removed\n", PROC_DIR_NAME, PROC_FILE_NAME);
+}
+
 
 /*******************************************************
 Description:
@@ -1816,11 +1818,7 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	if (ret) {
 		NVT_ERR("Cannot create sysfs structure!\n");
 	} 
-	ret = novatek_input_symlink(ts);
-	if (ret < 0) {
-		NVT_ERR("Failed to symlink input device!\n");
-	}
- 
+
 	bTouchIsAwake = 1;
 	NVT_LOG("end\n");
 
