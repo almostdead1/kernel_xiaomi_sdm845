@@ -1543,98 +1543,53 @@ static struct attribute *nvt_attr_group[] = {
     NULL
 };
 
+#define PAGESIZE 512
 
-#define PROC_DIR_NAME "touchpanel"
-#define PROC_FILE_NAME "gesture_enable"
-
-// Define a global variable to hold the gesture enable state
 static int gesture_enable_state = 0;
 
-// Read callback for /proc/touchpanel/gesture_enable
-static ssize_t gesture_enable_read_func(struct file *file, char __user *user_buf,
-                                        size_t count, loff_t *ppos)
-{
-    char page[32];
-    int len = snprintf(page, sizeof(page), "%d\n", gesture_enable_state); // Print the current state
-    if (len < 0)
-        return -EFAULT;
 
-    return simple_read_from_buffer(user_buf, count, ppos, page, len);
-}
-
-// Write callback for /proc/touchpanel/gesture_enable
-static ssize_t gesture_enable_write_func(struct file *file, const char __user *user_buf,
-                                         size_t count, loff_t *ppos)
-{
-    char page[32] = {0};
-    int ret, new_state;
-
-    if (count >= sizeof(page))
-        return -EINVAL;
-
-    if (copy_from_user(page, user_buf, count))
-        return -EFAULT;
-
-    page[count] = '\0'; // Null-terminate the string
-
-    ret = kstrtoint(page, 10, &new_state); // Convert input to integer
-    if (ret < 0) {
-        pr_err("Invalid input for %s: %s\n", PROC_FILE_NAME, page);
-        return -EINVAL;
+static ssize_t gesture_enable_read_func(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+    {
+        int ret = 0;
+        char page[PAGESIZE];
+        ret = sprintf(page, "%d\n", gesture_enable_state);
+        ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+        return ret;
     }
-
-    gesture_enable_state = new_state; // Update the global state
-    pr_info("%s state set to %d\n", PROC_FILE_NAME, gesture_enable_state);
-
-    return count;
-}
-
-// File operations for gesture_enable
+static ssize_t gesture_enable_write_func(struct file *file, const char __user *user_buf, size_t count, loff_t *ppos)\
+    {
+        int ret = 0;
+        char page[PAGESIZE] = {0};
+        ret = copy_from_user(page, user_buf, count);
+        ret = sscanf(page, "%d", &gesture_enable_state);
+        return count;
+    }
 static const struct file_operations gesture_enable_proc_fops = {
-    .read = gesture_enable_read_func,
-    .write = gesture_enable_write_func,
-    .open = simple_open,
-};
+        .write = gesture_enable_write_func,
+        .read =  gesture_enable_read_func,
+        .open = simple_open,
+        .owner = THIS_MODULE,
+    };
 
-// Module initialization function
-static int nvt_gesture_proc_init(void)
-{
-    struct proc_dir_entry *touchpanel_dir;
-    struct proc_dir_entry *gesture_enable_file;
+int nvt_gesture_proc_init(void) {
+    int ret = 0;
+    struct proc_dir_entry *touchpanel = NULL;
+    struct proc_dir_entry *gesture_enable = NULL;
 
-    pr_info("Initializing procfs entries for gesture enable\n");
+    touchpanel = proc_mkdir("touchpanel", NULL);
 
-    // Create /proc/touchpanel directory
-    touchpanel_dir = proc_mkdir(PROC_DIR_NAME, NULL);
-    if (!touchpanel_dir) {
-        pr_err("Failed to create /proc/%s directory\n", PROC_DIR_NAME);
-        return -ENOMEM;
+    if (touchpanel == NULL) {
+        ret = -ENOMEM;
+        NVT_LOG("[Nvt-ts] : Couldn't create /proc/touchpanel \n");
     }
-
-    // Create /proc/touchpanel/gesture_enable file
-    gesture_enable_file = proc_create(PROC_FILE_NAME, 0666, touchpanel_dir, &gesture_enable_proc_fops);
-    if (!gesture_enable_file) {
-        pr_err("Failed to create /proc/%s/%s file\n", PROC_DIR_NAME, PROC_FILE_NAME);
-        remove_proc_entry(PROC_DIR_NAME, NULL); // Clean up directory
-        return -ENOMEM;
+    
+    gesture_enable = proc_create(gesture_enable, 0666, touchpanel, &gesture_enable_proc_fops);
+    if (gesture_enable == NULL) {
+        ret = -ENOMEM;
+        NVT_LOG("[Nvt-ts] : Couldn't create " gesture_enable " in " touchpanel "\n");
     }
-
-    pr_info("/proc/%s/%s created successfully\n", PROC_DIR_NAME, PROC_FILE_NAME);
-    return 0;
+    return ret;
 }
-
-// Module cleanup function
-static void __exit nvt_gesture_proc_exit(void)
-{
-    pr_info("Removing procfs entries for gesture enable\n");
-
-    // Remove the created proc entries
-    remove_proc_entry(PROC_FILE_NAME, NULL);
-    remove_proc_entry(PROC_DIR_NAME, NULL);
-
-    pr_info("/proc/%s/%s removed successfully\n", PROC_DIR_NAME, PROC_FILE_NAME);
-}
-
 
 /*******************************************************
 Description:
