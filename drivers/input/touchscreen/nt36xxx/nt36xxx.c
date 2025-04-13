@@ -1597,7 +1597,7 @@ static const struct file_operations gesture_enable_proc_fops = {
 };
 
 // Module initialization function
-static int __init nvt_gesture_proc_init(void)
+static int nvt_gesture_proc_init(void)
 {
     struct proc_dir_entry *touchpanel_dir;
     struct proc_dir_entry *gesture_enable_file;
