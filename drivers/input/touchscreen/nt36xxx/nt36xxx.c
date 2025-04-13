@@ -1580,13 +1580,13 @@ int nvt_gesture_proc_init(void) {
 
     if (touchpanel_dir == NULL) {
         ret = -ENOMEM;
-        NVT_LOG("[Nvt-ts] : Couldn't create proc/touchpanel \n");
+        NVT_LOG("[Nvt-ts] : Couldn't create /proc/touchpanel \n");
     }
     
     gesture_enable_file = proc_create(gesture_enable, 0666, touchpanel_dir, &gesture_enable_proc_fops);
     if (gesture_enable == NULL) {
         ret = -ENOMEM;
-        NVT_LOG("[Nvt-ts] : Couldn't create " gesture_enable " in " touchpanel_dir "\n");
+        NVT_LOG("[Nvt-ts] : Couldn't create /proc/touchpanel/gesture_enable \n");
     }
     return ret;
 }
