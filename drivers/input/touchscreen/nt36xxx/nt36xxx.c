@@ -1573,17 +1573,17 @@ static const struct file_operations gesture_enable_proc_fops = {
 
 int nvt_gesture_proc_init(void) {
     int ret = 0;
-    struct proc_dir_entry *touchpanel_dir = NULL;
-    struct proc_dir_entry *gesture_enable_file = NULL;
+    struct proc_dir_entry *touchpanel = NULL;
+    struct proc_dir_entry *gesture_enable = NULL;
 
-    touchpanel_dir = proc_mkdir("touchpanel", NULL);
+    touchpanel = proc_mkdir("touchpanel", NULL);
 
-    if (touchpanel_dir == NULL) {
+    if (touchpanel == NULL) {
         ret = -ENOMEM;
         NVT_LOG("[Nvt-ts] : Couldn't create /proc/touchpanel \n");
     }
     
-    gesture_enable_file = proc_create(gesture_enable, 0666, touchpanel_dir, &gesture_enable_proc_fops);
+    gesture_enable = proc_create( "gesture_enable", 0666, touchpanel, &gesture_enable_proc_fops);
     if (gesture_enable == NULL) {
         ret = -ENOMEM;
         NVT_LOG("[Nvt-ts] : Couldn't create /proc/touchpanel/gesture_enable \n");
