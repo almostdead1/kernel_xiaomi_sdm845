@@ -1756,8 +1756,6 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	}
 #endif
 
-	er = nvt_gesture_proc_init();
-
 #if WAKEUP_GESTURE
 	for (retry = 0; retry < ARRAY_SIZE(gesture_key_array); retry++) {
 		input_set_capability(ts->input_dev, EV_KEY, gesture_key_array[retry]);
