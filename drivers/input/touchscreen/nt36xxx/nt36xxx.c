@@ -1547,6 +1547,8 @@ static struct proc_dir_entry *prEntry_tp = NULL;
 
 #define PAGESIZE 512
 
+#define BIT7 (0x1 << 7)
+
 int DouTap_gesture = 0; //"double tap"
 
 static ssize_t tp_gesture_read_func(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
@@ -1556,7 +1558,7 @@ static ssize_t tp_gesture_read_func(struct file *file, char __user *user_buf, si
 	struct nvt_ts_data *ts =
 	if(!ts)
 		return ret;
-	NVT_LOG("gesture enable is: %d\n", ts->gesture_enable);
+	NVT_DEBUG("gesture enable is: %d\n", ts->gesture_enable);
 	ret = sprintf(page, "%d\n", ts->gesture_enable);
 	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
 	return ret;
@@ -1571,7 +1573,7 @@ static ssize_t tp_gesture_write_func(struct file *file, const char __user *buffe
 	if( count > 2 || ts->is_suspended)
 		return count;
 	if( copy_from_user(buf, buffer, count) ){
-		NVT_LOG(pr_info "%s: read proc input error.\n", __func__);
+		NVT_ERR("%s: read proc input error.\n", __func__);
 		return count;
 	}
 	NVT_LOG("%s write [0x%x]\n",__func__,buf[0]);
@@ -1638,6 +1640,8 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	ts->client = client;
 	ts->input_proc = NULL; 
 	i2c_set_clientdata(client, ts);
+	ts = ts;
+	ts->is_suspended = 0;
 
 	//---parse dts---
 	nvt_parse_dt(&client->dev);
