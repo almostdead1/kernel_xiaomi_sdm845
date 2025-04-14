@@ -1543,51 +1543,73 @@ static struct attribute *nvt_attr_group[] = {
     NULL
 };
 
+static struct proc_dir_entry *prEntry_tp = NULL;
+
 #define PAGESIZE 512
 
-static int gesture_enable_state = 0;
+int DouTap_gesture = 0; //"double tap"
 
+static ssize_t tp_gesture_read_func(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int ret = 0;
+	char page[PAGESIZE];
+	struct nvt_ts_data *ts =
+	if(!ts)
+		return ret;
+	NVT_LOG("gesture enable is: %d\n", ts->gesture_enable);
+	ret = sprintf(page, "%d\n", ts->gesture_enable);
+	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
+	return ret;
+}
 
-static ssize_t gesture_enable_read_func(struct file *file, char __user *user_buf, size_t count, loff_t *ppos)
+static ssize_t tp_gesture_write_func(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
+{
+	char buf[10];
+	struct nvt_ts_data *ts =
+	if(!ts)
+		return count;
+	if( count > 2 || ts->is_suspended)
+		return count;
+	if( copy_from_user(buf, buffer, count) ){
+		NVT_LOG(pr_info "%s: read proc input error.\n", __func__);
+		return count;
+	}
+	NVT_LOG("%s write [0x%x]\n",__func__,buf[0]);
+
+    DouTap_gesture = (buf[0] & BIT7)?1:0; //double tap
+
+	if(DouTap_gesture)
+	{
+		ts->gesture_enable = 1;
+	}
+	else
     {
-        int ret = 0;
-        char page[PAGESIZE];
-        ret = sprintf(page, "%d\n", gesture_enable_state);
-        ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
-        return ret;
+        ts->gesture_enable = 0;
     }
-static ssize_t gesture_enable_write_func(struct file *file, const char __user *user_buf, size_t count, loff_t *ppos)\
-    {
-        int ret = 0;
-        char page[PAGESIZE] = {0};
-        ret = copy_from_user(page, user_buf, count);
-        ret = sscanf(page, "%d", &gesture_enable_state);
-        return count;
-    }
-static const struct file_operations gesture_enable_proc_fops = {
-        .write = gesture_enable_write_func,
-        .read =  gesture_enable_read_func,
-        .open = simple_open,
-        .owner = THIS_MODULE,
-    };
+	return count;
+}
+static const struct file_operations tp_gesture_proc_fops = {
+	.write = tp_gesture_write_func,
+	.read =  tp_gesture_read_func,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+};
 
-int nvt_gesture_proc_init(void) {
-    int ret = 0;
-    struct proc_dir_entry *touchpanel = NULL;
-    struct proc_dir_entry *gesture_enable = NULL;
+int nvt_gesture_proc_init(void)
+{
+	int ret = 0;
+	struct proc_dir_entry *prEntry_tmp  = NULL;
+	prEntry_tp = proc_mkdir("touchpanel", NULL);
+	if( prEntry_tp == NULL ){
+		ret = -ENOMEM;
+		NVT_LOG("Couldn't create touchpanel\n");
+	}
 
-    touchpanel = proc_mkdir("touchpanel", NULL);
-
-    if (touchpanel == NULL) {
-        ret = -ENOMEM;
-        NVT_LOG("[Nvt-ts] : Couldn't create /proc/touchpanel \n");
-    }
-    
-    gesture_enable = proc_create( "gesture_enable", 0666, touchpanel, &gesture_enable_proc_fops);
-    if (gesture_enable == NULL) {
-        ret = -ENOMEM;
-        NVT_LOG("[Nvt-ts] : Couldn't create /proc/touchpanel/gesture_enable \n");
-    }
+	prEntry_tmp = proc_create( "gesture_enable", 0666, prEntry_tp, &tp_gesture_proc_fops);
+	if(prEntry_tmp == NULL){
+		ret = -ENOMEM;
+        NVT_LOG("Couldn't create gesture_enable\n");
+	}
     return ret;
 }
 
