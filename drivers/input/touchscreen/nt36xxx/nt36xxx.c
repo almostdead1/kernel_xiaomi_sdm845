@@ -1569,6 +1569,7 @@ static ssize_t tp_gesture_write_func(struct file *file, const char __user *buffe
 {
 	char buf[10];
 	struct nvt_ts_data *ts = ts_g;
+	int write_value;
 	if(!ts)
 		return count;
 	if( count > 2 || ts->is_suspended)
