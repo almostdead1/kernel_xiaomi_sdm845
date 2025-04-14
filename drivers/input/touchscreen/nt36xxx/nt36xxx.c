@@ -1584,11 +1584,15 @@ static ssize_t tp_gesture_write_func(struct file *file, const char __user *buffe
 	if(DouTap_gesture)
 	{
 		ts->gesture_enable = 1;
+		write_value = 1;
 	}
 	else
     {
         ts->gesture_enable = 0;
+		write_value = 0;
     }
+	ts->gesture_enabled = write_value;
+
 	return count;
 }
 static const struct file_operations tp_gesture_proc_fops = {
