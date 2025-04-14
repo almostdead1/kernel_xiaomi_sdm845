@@ -1543,6 +1543,7 @@ static struct attribute *nvt_attr_group[] = {
     NULL
 };
 
+static struct synaptics_ts_data *ts_g = NULL;
 static struct proc_dir_entry *prEntry_tp = NULL;
 
 #define PAGESIZE 512
@@ -1555,10 +1556,10 @@ static ssize_t tp_gesture_read_func(struct file *file, char __user *user_buf, si
 {
 	int ret = 0;
 	char page[PAGESIZE];
-	struct nvt_ts_data *ts =
+	struct nvt_ts_data *ts = ts_g;
 	if(!ts)
 		return ret;
-	NVT_DEBUG("gesture enable is: %d\n", ts->gesture_enable);
+	NVT_LOG("gesture enable is: %d\n", ts->gesture_enable);
 	ret = sprintf(page, "%d\n", ts->gesture_enable);
 	ret = simple_read_from_buffer(user_buf, count, ppos, page, strlen(page));
 	return ret;
@@ -1567,7 +1568,7 @@ static ssize_t tp_gesture_read_func(struct file *file, char __user *user_buf, si
 static ssize_t tp_gesture_write_func(struct file *file, const char __user *buffer, size_t count, loff_t *ppos)
 {
 	char buf[10];
-	struct nvt_ts_data *ts =
+	struct nvt_ts_data *ts = ts_g;
 	if(!ts)
 		return count;
 	if( count > 2 || ts->is_suspended)
@@ -1629,6 +1630,8 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	int32_t retry = 0;
 #endif
 
+	struct nvt_ts_data *ts = NULL;
+
 	NVT_LOG("start\n");
 
 	ts = kzalloc(sizeof(struct nvt_ts_data), GFP_KERNEL);
@@ -1640,7 +1643,7 @@ static int32_t nvt_ts_probe(struct i2c_client *client, const struct i2c_device_i
 	ts->client = client;
 	ts->input_proc = NULL; 
 	i2c_set_clientdata(client, ts);
-	ts = ts;
+	ts_g = ts;
 	ts->is_suspended = 0;
 
 	//---parse dts---
