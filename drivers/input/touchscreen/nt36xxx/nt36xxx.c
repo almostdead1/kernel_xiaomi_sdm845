@@ -1543,7 +1543,7 @@ static struct attribute *nvt_attr_group[] = {
     NULL
 };
 
-static struct synaptics_ts_data *ts_g = NULL;
+static struct nvt_ts_data *ts_g = NULL;
 static struct proc_dir_entry *prEntry_tp = NULL;
 
 #define PAGESIZE 512
