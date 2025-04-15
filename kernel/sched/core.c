@@ -98,6 +98,7 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 #include "walt.h"
+#include <linux/oem/cpufreq_bouncing.h>
 
 ATOMIC_NOTIFIER_HEAD(load_alert_notifier_head);
 

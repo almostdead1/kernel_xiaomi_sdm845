@@ -19,6 +19,8 @@
 #include <linux/sched/sysctl.h>
 #include "sched.h"
 #include "tune.h"
+#include <../drivers/oneplus/coretech/uxcore/opchain_helper.h>
+#include <linux/oem/cpufreq_bouncing.h>
 
 #ifdef CONFIG_HOUSTON
 #include <oneplus/houston/houston_helper.h>
@@ -321,6 +323,9 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 #endif
 
 	trace_sugov_next_freq(policy->cpu, util, max, freq);
+#ifdef CONFIG_OPLUS_FEATURE_CPUFREQ_BOUNCING
+	freq = cb_cap(policy, freq);
+#endif
 	if (freq == sg_policy->cached_raw_freq && sg_policy->next_freq != UINT_MAX)
 		return sg_policy->next_freq;
 	sg_policy->cached_raw_freq = freq;
@@ -477,6 +482,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	bool busy;
 
 	flags &= ~SCHED_CPUFREQ_RT_DL;
+	cb_update(sg_policy->policy, time);
 
 	if (!sg_policy->tunables->pl && flags & SCHED_CPUFREQ_PL)
 		return;
