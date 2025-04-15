@@ -2260,6 +2260,12 @@ struct task_struct {
 	int hot_count;
 #endif
 
+#ifdef CONFIG_TPD
+	int tpd;
+	int dtpd;  /* dynamic tpd task */
+	int dtpdg; /* dynamic tpd task group */
+#endif
+
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*
