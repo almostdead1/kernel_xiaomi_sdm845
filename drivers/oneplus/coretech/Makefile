@@ -5,3 +5,4 @@ obj-$(CONFIG_DEFRAG_HELPER) += defrag/
 obj-$(CONFIG_HOUSTON) += houston/
 obj-$(CONFIG_OPCHAIN) += uxcore/ uxcore/core/
 obj-$(CONFIG_SMART_BOOST) += smartboost/ smartboost/core/
+obj-$(CONFIG_TPD) += tpd/

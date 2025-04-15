@@ -27,7 +27,11 @@ config SMART_BOOST
         default n
         help
          Smart Boost feature
-
+config TPD
+	default n
+	bool "a task placement decision for cpu limitation"
+	help
+	 Task affinity by decison
 config OPLUS_FEATURE_SUGOV_TL
 	default n
 	bool "A power optimization feature target loads"
