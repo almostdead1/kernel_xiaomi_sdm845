@@ -7236,7 +7236,7 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	unsigned int active_cpus_count = 0;
 	int isolated_candidate = -1;
 	int prev_cpu = task_cpu(p);
-
+	cpumask_t new_allowed_cpus;
 	*backup_cpu = -1;
 
 	schedstat_inc(p->se.statistics.nr_wakeups_fbt_attempts);
