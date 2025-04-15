@@ -42,6 +42,10 @@
 
 #define opc_claim_bit_test(claim, cpu) (claim & ((1 << cpu) | (1 << (cpu + num_present_cpus()))))
 
+#ifdef CONFIG_TPD
+#include <linux/oem/tpd.h>
+#endif
+
 #ifdef CONFIG_SCHED_WALT
 
 static inline bool task_fits_max(struct task_struct *p, int cpu);
@@ -7200,7 +7204,11 @@ static int start_cpu(struct task_struct *p, bool boosted,
 		start_cpu = rd->min_cap_orig_cpu;
 	else
 		start_cpu = rd->max_cap_orig_cpu;
-
+#ifdef CONFIG_TPD
+	if ((is_dynamic_tpd_task(p) || is_tpd_task(p)) && is_tpd_enable()) {
+		start_cpu = tpd_suggested_cpu(p, start_cpu);
+}
+#endif
 	return walt_start_cpu(start_cpu);
 }
 
@@ -7252,6 +7260,14 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 
 	/* Scan CPUs in all SDs */
 	sg = sd->groups;
+	cpumask_copy(&new_allowed_cpus, &p->cpus_allowed);
+#ifdef CONFIG_TPD
+	if (is_tpd_enable() && is_tpd_task(p)) {
+		tpd_mask(p, &new_allowed_cpus);
+	}
+	cpumask_copy(&p->cpus_allowed, &new_allowed_cpus);
+#endif
+
 	do {
 		cpumask_t search_cpus;
 		bool do_rotate = false, avoid_prev_cpu = false;
@@ -7856,13 +7872,22 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu, int sync
 			p->state == TASK_WAKING)
 			delta = task_util(p);
 #endif
-		/* Not enough spare capacity on previous cpu */
+#ifdef CONFIG_TPD
+		if (__cpu_overutilized(prev_cpu, delta) || (is_tpd_enable() && is_tpd_task(p))) {
+			schedstat_inc(p->se.statistics.nr_wakeups_secb_insuff_cap);
+			schedstat_inc(this_rq()->eas_stats.secb_insuff_cap);
+			target_cpu = next_cpu;
+			goto out;
+		}
+
+#else
 		if (__cpu_overutilized(prev_cpu, delta)) {
 			schedstat_inc(p->se.statistics.nr_wakeups_secb_insuff_cap);
 			schedstat_inc(this_rq()->eas_stats.secb_insuff_cap);
 			target_cpu = next_cpu;
 			goto out;
 		}
+#endif
 
 		/* Check if EAS_CPU_NXT is a more energy efficient CPU */
 		if (select_energy_cpu_idx(&eenv) != EAS_CPU_PRV) {
@@ -8726,6 +8751,20 @@ static inline int migrate_degrades_locality(struct task_struct *p,
 }
 #endif
 
+#ifdef CONFIG_TPD
+static inline bool can_migrate_tpd_task(struct task_struct *p,
+		int src_cpu, int dst_cpu)
+{
+	if (is_tpd_enable() && is_tpd_task(p)) {
+		/*avoid task migrate to wrong tpd suggested cpu*/
+		if (tpd_check(p, dst_cpu))
+			return false;
+	}
+
+	return true;
+}
+#endif
+
 /*
  * can_migrate_task - may task p from runqueue rq be migrated to this_cpu?
  */
@@ -8745,6 +8784,11 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 	 */
 	if (throttled_lb_pair(task_group(p), env->src_cpu, env->dst_cpu))
 		return 0;
+
+#ifdef CONFIG_TPD
+	if (!can_migrate_tpd_task(p, env->src_cpu, env->dst_cpu))
+		return 0;
+#endif
 
 	if (!cpumask_test_cpu(env->dst_cpu, tsk_cpus_allowed(p))) {
 		int cpu;

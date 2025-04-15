@@ -65,6 +65,9 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
+#ifdef CONFIG_TPD
+#include <linux/oem/tpd.h>
+#endif
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
 	nr_threads--;
@@ -169,6 +172,10 @@ static void __exit_signal(struct task_struct *tsk)
 static void delayed_put_task_struct(struct rcu_head *rhp)
 {
 	struct task_struct *tsk = container_of(rhp, struct task_struct, rcu);
+
+#ifdef CONFIG_TPD
+	tpd_tglist_del(tsk);
+#endif
 
 	perf_event_delayed_put(tsk);
 	trace_sched_process_free(tsk);

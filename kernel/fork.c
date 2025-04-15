@@ -565,6 +565,11 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	/*Curtis, 20180425, non-exist dcache*/
 	tsk->nn = NULL;
 #endif
+#ifdef CONFIG_TPD
+	tsk->tpd = 0;
+	tsk->dtpd = 0;
+	tsk->dtpdg = -1;
+#endif
 	account_kernel_stack(tsk, 1);
 
 	kcov_task_init(tsk);
