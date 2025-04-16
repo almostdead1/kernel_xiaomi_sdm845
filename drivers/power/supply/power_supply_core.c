@@ -22,10 +22,6 @@
 #include <linux/thermal.h>
 #include "power_supply.h"
 
-#ifdef CONFIG_HOUSTON
-#include <oneplus/houston/houston_helper.h>
-#endif
-
 /* exported for the APM Power driver, APM emulation */
 struct class *power_supply_class;
 EXPORT_SYMBOL_GPL(power_supply_class);
@@ -810,9 +806,7 @@ __power_supply_register(struct device *parent,
 			   &psy->deferred_register_work,
 			   POWER_SUPPLY_DEFERRED_REGISTER_TIME);
 
-#ifdef CONFIG_HOUSTON
 	ht_register_power_supply(psy);
-#endif
 
 	return psy;
 
