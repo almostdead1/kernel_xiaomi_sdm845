@@ -1752,7 +1752,7 @@ static void update_history(struct rq *rq, struct task_struct *p,
 
 	if (sched_window_stats_policy == WINDOW_STATS_RECENT) {
 		demand = runtime;
-	} else if (sched_window_stats_policy == WINDOW_STATS_MAX) {
+	} else if (sched_window_stats_policy == WINDOW_STATS_MAX ||
 	    ((likely(opc_boost_tl) && *opc_boost_tl) && task_cpu(p) >= 4)) {
 		demand = max;
 	} else {
