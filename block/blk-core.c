@@ -43,6 +43,10 @@
 
 #include <linux/math64.h>
 
+#ifdef CONFIG_MEMPLUS
+#include <oneplus/memplus/memplus_helper.h>
+#endif
+
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_remap);
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_rq_remap);
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_complete);
@@ -2138,20 +2142,30 @@ blk_qc_t submit_bio(struct bio *bio)
 		}
 	}
 
-	s_total_time = jiffies;
-	s_running_time = current->se.sum_exec_runtime;
-	s_runnable_time = current->sched_info.run_delay;
+/*dylanchang, 2019/4/30, add foreground task io opt*/
+#ifdef CONFIG_MEMPLUS
+	if (current_is_swapind())
+		bio->bi_opf |= REQ_FG;
+	else if (high_prio_for_task(current))
+		bio->bi_opf |= REQ_FG;
+#else
+	if (high_prio_for_task(current))
+		bio->bi_opf |= REQ_FG;
+#endif
+
+	/*
+	 * If we're reading data that is part of the userspace
+	 * workingset, count submission time as memory stall. When the
+	 * device is congested, or the submitting cgroup IO-throttled,
+	 * submission can be a significant part of overall IO time.
+	 */
+	if (workingset_read)
+		psi_memstall_enter(&pflags);
+
 	ret = generic_make_request(bio);
-	if (IO_SHOW_LOG) {
-		delta = jiffies_to_msecs(jiffies - s_total_time);
-		if (delta > IO_BLK_SUBMIT_BIO_LEVEL) {
-			pr_info("Slow IO BLK|Submit_bio:  %d(%s) prio(%d|%d), total_time(%dms) running_time(%lluns) runnable(%lluns)\n",
-				current->pid, current->comm,
-				current->policy, current->prio, delta,
-				current->se.sum_exec_runtime - s_running_time,
-				current->sched_info.run_delay - s_runnable_time);
-		}
-	}
+
+	if (workingset_read)
+		psi_memstall_leave(&pflags);
 
 	return ret;
 }
