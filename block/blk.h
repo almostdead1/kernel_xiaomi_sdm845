@@ -326,3 +326,5 @@ static inline void blk_throtl_exit(struct request_queue *q) { }
 #endif /* CONFIG_BLK_DEV_THROTTLING */
 
 #endif /* BLK_INTERNAL_H */
+
+extern bool is_fg(int uid);
