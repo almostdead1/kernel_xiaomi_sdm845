@@ -2578,8 +2578,6 @@ static void shrink_node_memcg(struct pglist_data *pgdat, struct mem_cgroup *memc
 	while (nr[MEMPLUS_PAGE_LRU] || nr[LRU_ACTIVE_FILE] ||
 			 nr[LRU_INACTIVE_FILE]) {
     /* modify end */
-	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_FILE] ||
-					nr[LRU_INACTIVE_FILE]) {
 		unsigned long nr_anon, nr_file, percentage;
 		unsigned long nr_scanned;
 
