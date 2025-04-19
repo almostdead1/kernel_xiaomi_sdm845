@@ -4,6 +4,7 @@ obj-$(CONFIG_CRPL) += crpl/
 obj-$(CONFIG_DEFRAG_HELPER) += defrag/
 obj-$(CONFIG_HOUSTON) += houston/
 obj-$(CONFIG_MEMPLUS) += memplus/
+obj-$(CONFIG_AIGOV) += aigov/
 obj-$(CONFIG_OPCHAIN) += uxcore/ uxcore/core/
 obj-$(CONFIG_SMART_BOOST) += smartboost/ smartboost/core/
 obj-$(CONFIG_TPD) += tpd/
