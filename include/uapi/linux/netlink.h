@@ -28,6 +28,10 @@
 #define NETLINK_RDMA		20
 #define NETLINK_CRYPTO		21	/* Crypto layer */
 #define NETLINK_SOCKEV          22      /* Socket Administrative Events */
+#ifdef CONFIG_OP_FREEZER
+// add for op freeze manager
+#define NETLINK_OP_FREEZER       28      /* Socket for freezing solution*/
+#endif
 #define NETLINK_INET_DIAG	NETLINK_SOCK_DIAG
 #define NETLINK_OP_SLA		29
 
