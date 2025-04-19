@@ -22,6 +22,18 @@
 #include <oneplus/houston/houston_helper.h>
 #include <linux/jiffies.h>
 
+/* ais */ //dummy for now to shut up logs spam
+static int ais_enable = 0;
+module_param_named(ais_enable, ais_enable, int, 0664);
+
+/* pmu */ //dummy for now to shut up logs spam
+static int perf_ready = -1;
+module_param_named(perf_ready, perf_ready, int, 0664);
+
+/* hwui boost online config switch */ //dummy for now to shut up logs spam
+static int ht_hwui_boost_enable = 1;
+module_param_named(hwui_boost_enable, ht_hwui_boost_enable, int, 0664);
+
 #define HT_POLLING_MIN_INTERVAL (100)
 #define HT_REPORT_PERIOD_MAX (18000)
 
