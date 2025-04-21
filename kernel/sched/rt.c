@@ -1780,10 +1780,6 @@ static int find_lowest_rq(struct task_struct *task)
 	/* Curtis, 20180109, ux realm */
 	bool best_cpu_is_claimed = false;
 
-	/* For surfaceflinger with util > 90, prefer to use big core */
-	if (task->compensate_need == 2 && tutil > 90)
-		boost_on_big = true;
-
 	/* Make sure the mask is initialized first */
 	if (unlikely(!lowest_mask))
 		return -1;
