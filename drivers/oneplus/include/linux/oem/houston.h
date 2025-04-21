@@ -202,6 +202,8 @@ struct ai_parcel {
 	struct ai_thread_parcel t[AI_THREAD_PARCEL_MAX];
 };
 
+extern int ohm_get_cur_cpuload(bool ctrl);
+
 /* cpu load info */
 struct cpuload {
 	union {
