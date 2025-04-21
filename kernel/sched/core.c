@@ -100,6 +100,10 @@
 #include "walt.h"
 #include <linux/oem/cpufreq_bouncing.h>
 
+#ifdef CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
+#endif
+
 ATOMIC_NOTIFIER_HEAD(load_alert_notifier_head);
 
 DEFINE_MUTEX(sched_domains_mutex);
@@ -3731,6 +3735,10 @@ static void __sched notrace __schedule(bool preempt)
 		++*switch_count;
 
 		trace_sched_switch(preempt, prev, next);
+
+#ifdef CONFIG_HOUSTON
+		ht_sched_switch_update(prev, next);
+#endif
 		rq = context_switch(rq, prev, next, &rf); /* unlocks the rq */
 	} else {
 		update_task_ravg(prev, rq, TASK_UPDATE, wallclock, 0);

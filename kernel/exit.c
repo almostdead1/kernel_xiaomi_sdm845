@@ -65,6 +65,10 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
+#ifdef CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
+#endif
+
 #ifdef CONFIG_TPD
 #include <linux/oem/tpd.h>
 #endif
@@ -187,6 +191,10 @@ void release_task(struct task_struct *p)
 {
 	struct task_struct *leader;
 	int zap_leader;
+
+#ifdef CONFIG_HOUSTON
+	ht_rtg_list_del(p);
+#endif
 #ifdef CONFIG_OPLUS_FEATURE_FUSE_FS_SHORTCIRCUIT
 	if (p->fpack) {
 		if (p->fpack->iname)
@@ -821,6 +829,10 @@ void __noreturn do_exit(long code)
 	exit_task_namespaces(tsk);
 	exit_task_work(tsk);
 	exit_thread(tsk);
+
+#ifdef CONFIG_HOUSTON
+	ht_perf_event_release(tsk);
+#endif
 
 	/*
 	 * Flush inherited counters to the parent - before the parent

@@ -81,6 +81,10 @@
 #include <linux/kcov.h>
 #include <linux/cpufreq_times.h>
 
+#ifdef CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
+#endif
+
 #include <linux/adj_chain.h>
 
 #include <asm/pgtable.h>
@@ -2032,6 +2036,15 @@ static __latent_entropy struct task_struct *copy_process(
 
 	trace_task_newtask(p, clone_flags);
 	uprobe_copy_process(p, clone_flags);
+
+#if defined(CONFIG_HOUSTON)
+	if (likely(!IS_ERR(p))) {
+#ifdef CONFIG_HOUSTON
+		ht_perf_event_init(p);
+		ht_rtg_init(p);
+#endif
+	}
+#endif
 
 	return p;
 
