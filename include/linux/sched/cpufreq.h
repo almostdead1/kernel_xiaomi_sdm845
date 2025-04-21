@@ -10,7 +10,7 @@
 
 
 #ifdef CONFIG_AIGOV
-#define SCHED_CPUFREQ_AIGOV (1U << 9)
+#define SCHED_CPUFREQ_AIGOV (1U << 8)
 #endif
 
 
