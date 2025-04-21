@@ -2277,6 +2277,10 @@ struct task_struct {
 	int cached_prio;
 #endif
 
+#ifdef CONFIG_IM
+	int im_flag;
+#endif
+
 #ifdef CONFIG_TPD
 	int tpd;
 	int dtpd;  /* dynamic tpd task */

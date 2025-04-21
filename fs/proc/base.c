@@ -2601,6 +2601,20 @@ static const struct file_operations proc_pid_set_timerslack_ns_operations = {
 	.release	= single_release,
 };
 
+#ifdef CONFIG_IM
+static int proc_im_flag(struct seq_file *m, struct pid_namespace *ns,
+				struct pid *pid, struct task_struct *task)
+{
+#define IM_TAG_DESC_LEN (128)
+	char desc[IM_TAG_DESC_LEN] = {0};
+
+	im_to_str(task->im_flag, desc, IM_TAG_DESC_LEN);
+	desc[IM_TAG_DESC_LEN - 1] = '\0';
+	seq_printf(m, "%d %s\n", task->im_flag, desc);
+	return 0;
+}
+#endif /* CONFIG_IM */
+
 #ifdef CONFIG_TPD
 static ssize_t
 tpd_write(struct file *file, const char __user *buf,
@@ -3377,6 +3391,9 @@ static const struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_CPU_FREQ_TIMES
 	ONE("time_in_state", 0444, proc_time_in_state_show),
 #endif
+#ifdef CONFIG_IM
+	ONE("im_flag", 0444, proc_im_flag),
+#endif
 #ifdef CONFIG_MEMPLUS
 	REG("memplus_type", 0666,
 		proc_pid_memplus_type_operations),
@@ -3787,6 +3804,9 @@ static const struct pid_entry tid_base_stuff[] = {
 #endif
 #ifdef CONFIG_CPU_FREQ_TIMES
 	ONE("time_in_state", 0444, proc_time_in_state_show),
+#endif
+#ifdef CONFIG_IM
+	ONE("im_flag", 0444, proc_im_flag),
 #endif
 #ifdef CONFIG_TPD
 	REG("tpd", 0666, proc_tpd_operation),

@@ -201,6 +201,10 @@ void release_task(struct task_struct *p)
 #ifdef CONFIG_HOUSTON
 	ht_rtg_list_del(p);
 #endif
+#ifdef CONFIG_IM
+	if (!im_render_grouping_enable())
+		im_list_del_task(p);
+#endif
 #ifdef CONFIG_OPLUS_FEATURE_FUSE_FS_SHORTCIRCUIT
 	if (p->fpack) {
 		if (p->fpack->iname)
