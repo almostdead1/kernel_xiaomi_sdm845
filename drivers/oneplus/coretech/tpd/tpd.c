@@ -1,6 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/cred.h>
+#include <linux/oem/im.h>
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/oem/tpd.h>
