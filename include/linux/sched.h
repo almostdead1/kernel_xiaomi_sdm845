@@ -62,6 +62,10 @@ struct sched_param {
 
 #include <asm/processor.h>
 
+#ifdef CONFIG_CONTROL_CENTER
+#include <oneplus/control_center/control_center_helper.h>
+#endif
+
 #define SCHED_ATTR_SIZE_VER0	48	/* sizeof first published struct */
 #ifdef CONFIG_PACKAGE_RUNTIME_INFO
 #define HISTORY_ITMES           4
@@ -2266,6 +2270,13 @@ struct task_struct {
 	int hot_count;
 #endif
 
+#ifdef CONFIG_CONTROL_CENTER
+	bool cc_enable;
+	struct cc_tsk_data *ctd;
+	u64 nice_effect_ts;
+	int cached_prio;
+#endif
+
 #ifdef CONFIG_TPD
 	int tpd;
 	int dtpd;  /* dynamic tpd task */
@@ -3043,6 +3054,11 @@ static inline void sched_autogroup_detach(struct task_struct *p) { }
 static inline void sched_autogroup_fork(struct signal_struct *sig) { }
 static inline void sched_autogroup_exit(struct signal_struct *sig) { }
 static inline void sched_autogroup_exit_task(struct task_struct *p) { }
+#endif
+
+#ifdef CONFIG_CONTROL_CENTER
+extern void restore_user_nice_safe(struct task_struct *p);
+extern void set_user_nice_no_cache(struct task_struct *p, long nice);
 #endif
 
 extern int yield_to(struct task_struct *p, bool preempt);

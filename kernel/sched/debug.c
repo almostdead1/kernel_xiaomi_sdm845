@@ -1075,6 +1075,12 @@ void proc_sched_show_task(struct task_struct *p, struct seq_file *m)
 #endif
 	P(policy);
 	P(prio);
+#ifdef CONFIG_CONTROL_CENTER
+		/* should remove later */
+		P(static_prio);
+		P(normal_prio);
+		P(cached_prio);
+#endif
 #undef PN_SCHEDSTAT
 #undef PN
 #undef __PN

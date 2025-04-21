@@ -72,6 +72,12 @@
 #ifdef CONFIG_TPD
 #include <linux/oem/tpd.h>
 #endif
+
+// tedlin@ASTI 2019/06/12 add for CONFIG_CONTROL_CENTER
+#ifdef CONFIG_CONTROL_CENTER
+#include <oneplus/control_center/control_center_helper.h>
+#endif
+
 static void __unhash_process(struct task_struct *p, bool group_dead)
 {
 	nr_threads--;
@@ -829,6 +835,10 @@ void __noreturn do_exit(long code)
 	exit_task_namespaces(tsk);
 	exit_task_work(tsk);
 	exit_thread(tsk);
+
+#ifdef CONFIG_CONTROL_CENTER
+	cc_tsk_free((void*) tsk);
+#endif
 
 #ifdef CONFIG_HOUSTON
 	ht_perf_event_release(tsk);

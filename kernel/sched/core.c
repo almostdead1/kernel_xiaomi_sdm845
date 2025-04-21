@@ -844,6 +844,11 @@ void deactivate_task(struct rq *rq, struct task_struct *p, int flags)
 		clear_ed_task(p, rq);
 
 	dequeue_task(rq, p, flags);
+
+#if defined(CONFIG_CONTROL_CENTER) && defined(CONFIG_IM)
+		if (unlikely(im_ux(p)))
+			restore_user_nice_safe(p);
+#endif
 }
 
 static void update_rq_clock_task(struct rq *rq, s64 delta)
@@ -2578,10 +2583,16 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 		if (task_has_dl_policy(p) || task_has_rt_policy(p)) {
 			p->policy = SCHED_NORMAL;
 			p->static_prio = NICE_TO_PRIO(0);
+#ifdef CONFIG_CONTROL_CENTER
+			p->cached_prio = p->static_prio;
+#endif
 			p->rt_priority = 0;
 		} else if (PRIO_TO_NICE(p->static_prio) < 0)
+#ifdef CONFIG_CONTROL_CENTER
+			p->cached_prio = p->static_prio = NICE_TO_PRIO(0);
+#else
 			p->static_prio = NICE_TO_PRIO(0);
-
+#endif
 		p->prio = p->normal_prio = __normal_prio(p);
 		set_load_weight(p);
 
@@ -4074,7 +4085,34 @@ out_unlock:
 }
 #endif
 
-void set_user_nice(struct task_struct *p, long nice)
+#ifdef CONFIG_CONTROL_CENTER
+void restore_user_nice_safe(struct task_struct *p)
+{
+	long nice = PRIO_TO_NICE(p->cached_prio);
+
+	if (rt_prio(p->prio))
+		return;
+
+	if (task_nice(p) == nice || nice < MIN_NICE || nice > MAX_NICE)
+		return;
+
+	if (task_on_rq_queued(p))
+		return;
+
+	if (task_current(task_rq(p), p))
+		return;
+
+	if (!time_after64(get_jiffies_64(), p->nice_effect_ts))
+		return;
+
+	p->static_prio = NICE_TO_PRIO(nice);
+	set_load_weight(p);
+	p->prio = effective_prio(p);
+
+	p->nice_effect_ts = ULLONG_MAX;
+}
+
+void set_user_nice_no_cache(struct task_struct *p, long nice)
 {
 	bool queued, running;
 	int old_prio, delta;
@@ -4083,11 +4121,14 @@ void set_user_nice(struct task_struct *p, long nice)
 
 	if (task_nice(p) == nice || nice < MIN_NICE || nice > MAX_NICE)
 		return;
+
 	/*
 	 * We have to be careful, if called from sys_setpriority(),
 	 * the task might be in the middle of scheduling on another CPU.
 	 */
 	rq = task_rq_lock(p, &rf);
+	update_rq_clock(rq);
+
 	/*
 	 * The RT priorities are set via sched_setscheduler(), but we still
 	 * allow the 'normal' nice value to be set - but as expected
@@ -4101,11 +4142,74 @@ void set_user_nice(struct task_struct *p, long nice)
 	queued = task_on_rq_queued(p);
 	running = task_current(rq, p);
 	if (queued)
+		dequeue_task(rq, p, DEQUEUE_SAVE | DEQUEUE_NOCLOCK);
+	if (running)
+		put_prev_task(rq, p);
+
+	p->static_prio = NICE_TO_PRIO(nice);
+	set_load_weight(p);
+	old_prio = p->prio;
+	p->prio = effective_prio(p);
+	delta = p->prio - old_prio;
+
+	if (queued) {
+		enqueue_task(rq, p, ENQUEUE_RESTORE | ENQUEUE_NOCLOCK);
+		if (delta < 0 || (delta > 0 && task_running(rq, p)))
+			resched_curr(rq);
+	}
+	if (running)
+		set_curr_task(rq, p);
+out_unlock:
+	task_rq_unlock(rq, p, &rf);
+}
+EXPORT_SYMBOL(set_user_nice_no_cache);
+#endif
+
+void set_user_nice(struct task_struct *p, long nice)
+{
+	bool queued, running;
+	int old_prio, delta;
+	struct rq_flags rf;
+	struct rq *rq;
+
+#ifdef CONFIG_CONTROL_CENTER
+	if (task_nice(p) == nice || nice < MIN_NICE || nice > MAX_NICE) {
+		p->cached_prio = p->static_prio;
+		return;
+	}
+#else
+	if (task_nice(p) == nice || nice < MIN_NICE || nice > MAX_NICE)
+		return;
+#endif
+	/*
+	 * We have to be careful, if called from sys_setpriority(),
+	 * the task might be in the middle of scheduling on another CPU.
+	 */
+	rq = task_rq_lock(p, &rf);
+	/*
+	 * The RT priorities are set via sched_setscheduler(), but we still
+	 * allow the 'normal' nice value to be set - but as expected
+	 * it wont have any effect on scheduling until the task is
+	 * SCHED_DEADLINE, SCHED_FIFO or SCHED_RR:
+	 */
+	if (task_has_dl_policy(p) || task_has_rt_policy(p)) {
+		p->static_prio = NICE_TO_PRIO(nice);
+#ifdef CONFIG_CONTROL_CENTER
+		p->cached_prio = p->static_prio;
+#endif
+		goto out_unlock;
+	}
+	queued = task_on_rq_queued(p);
+	running = task_current(rq, p);
+	if (queued)
 		dequeue_task(rq, p, DEQUEUE_SAVE);
 	if (running)
 		put_prev_task(rq, p);
 
 	p->static_prio = NICE_TO_PRIO(nice);
+#ifdef CONFIG_CONTROL_CENTER
+	p->cached_prio = p->static_prio;
+#endif
 	set_load_weight(p);
 	old_prio = p->prio;
 	p->prio = effective_prio(p);
@@ -4296,7 +4400,12 @@ static void __setscheduler_params(struct task_struct *p,
 	if (dl_policy(policy))
 		__setparam_dl(p, attr);
 	else if (fair_policy(policy))
+#ifdef CONFIG_CONTROL_CENTER
+		p->cached_prio =
+			p->static_prio = NICE_TO_PRIO(attr->sched_nice);
+#else
 		p->static_prio = NICE_TO_PRIO(attr->sched_nice);
+#endif
 
 	/*
 	 * __sched_setscheduler() ensures attr->sched_priority == 0 when

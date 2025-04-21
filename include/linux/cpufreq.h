@@ -136,6 +136,14 @@ struct cpufreq_policy {
 	struct cpufreq_stats	*gov_stats;
 	/* For cpufreq driver's internal use */
 	void			*driver_data;
+
+#ifdef CONFIG_CONTROL_CENTER
+	unsigned int req_freq;
+	unsigned int cc_min;
+	unsigned int cc_max;
+	spinlock_t cc_lock;
+	bool cc_enable;
+#endif
 };
 
 /* Only for ACPI */
