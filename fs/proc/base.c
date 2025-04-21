@@ -90,6 +90,8 @@
 #include <linux/posix-timers.h>
 #include <linux/cpufreq_times.h>
 
+#include <linux/oem/im.h>
+
 #include <linux/adj_chain.h>
 
 #ifdef CONFIG_HARDWALL
