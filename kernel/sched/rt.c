@@ -1774,8 +1774,15 @@ static int find_lowest_rq(struct task_struct *task)
 	int start_cpu = walt_start_cpu(prev_cpu);
 	bool do_rotate = false;
 	bool avoid_prev_cpu = false;
+	bool boost_on_big = sched_boost() == FULL_THROTTLE_BOOST ?
+				  (sched_boost_policy() == SCHED_BOOST_ON_BIG) :
+				  false;
 	/* Curtis, 20180109, ux realm */
 	bool best_cpu_is_claimed = false;
+
+	/* For surfaceflinger with util > 90, prefer to use big core */
+	if (task->compensate_need == 2 && tutil > 90)
+		boost_on_big = true;
 
 	/* Make sure the mask is initialized first */
 	if (unlikely(!lowest_mask))
