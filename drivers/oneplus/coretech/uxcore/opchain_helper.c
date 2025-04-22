@@ -164,5 +164,6 @@ void __exit opc_exit_module(void)
 	uxcore_api.opc_add_to_chain_t = NULL;
 	uxcore_api.opc_check_uxtop_cpu_t = NULL;
 	opc_boost_tl = NULL;
+	opc_boost = NULL;
 }
 EXPORT_SYMBOL(opc_exit_module);

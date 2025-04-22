@@ -44,7 +44,7 @@
 
 struct opchain_cb {
 	unsigned int (*is_opc_task_t)(void *rq, void *t, int type);
-	void (*opc_binder_pass_t)(void *rq, void* cur, unsigned int dsize, unsigned int *data, int send);
+	int (*opc_binder_pass_t)(void *rq, void* cur, unsigned int dsize, unsigned int *data, int send);
 	void (*opc_task_switch_t)(unsigned int enqueue, int cpu, void *p, void *rq, unsigned long long clock);
 	int (*opc_get_claim_on_cpu_t)(int cpu, void *rq);
 	unsigned int (*opc_get_claims_t)(void **rqs);
