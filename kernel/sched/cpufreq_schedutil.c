@@ -158,11 +158,6 @@ static void sugov_update_commit(struct sugov_policy *sg_policy, u64 time,
 {
 	struct cpufreq_policy *policy = sg_policy->policy;
 
-#ifdef CONFIG_CONTROL_CENTER
-	/* keep requested freq */
-	sg_policy->policy->req_freq = next_freq;
-#endif
-
 	/*yankelong add ,modify judging condition*/
 	if (policy->cur == next_freq) {
 		sg_policy->next_freq = next_freq;
@@ -323,6 +318,9 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	unsigned int freq = arch_scale_freq_invariant() ?
 				policy->cpuinfo.max_freq : policy->cur;
 
+#ifdef CONFIG_CONTROL_CENTER
+	unsigned int req_freq;
+
 #ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
 	unsigned int prev_freq = freq;
 	unsigned int prev_laf = prev_freq * util * 100 / max;
@@ -330,23 +328,52 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 	freq = choose_freq(sg_policy, prev_laf);
 	trace_sugov_next_freq_tl(policy->cpu, util, max, freq, prev_laf, prev_freq);
 #else
-	freq = (freq + (freq >> 2)) * util / max;
+	freq = map_util_freq(util, freq, max);
+#endif
+	if (freq == sg_policy->cached_raw_freq &&
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+	    prev_laf == sg_policy->cached_raw_laf &&
+#endif
+	    !sg_policy->need_freq_update) {
+		req_freq = sg_policy->next_freq;
+		goto out;
+	}
+
+	sg_policy->need_freq_update = false;
+	sg_policy->cached_raw_freq = freq;
+
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+	sg_policy->cached_raw_laf = prev_laf;
 #endif
 
+	req_freq = cpufreq_driver_resolve_freq(policy, freq);
+out:
+	/* keep resolved freq */
+	sg_policy->policy->req_freq = req_freq;
+	trace_sugov_next_freq(policy->cpu, util, max, freq, req_freq);
+	return req_freq;
+#else
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+	unsigned int prev_freq = freq;
+	unsigned int prev_laf = prev_freq * util * 100 / max;
+
+	freq = choose_freq(sg_policy, prev_laf);
+	trace_sugov_next_freq_tl(policy->cpu, util, max, freq, prev_laf, prev_freq);
+#else
+	freq = map_util_freq(util, freq, max);
 	trace_sugov_next_freq(policy->cpu, util, max, freq);
-
-#ifdef CONFIG_CONTROL_CENTER
-	/* keep requested freq */
-	sg_policy->policy->req_freq = freq;
 #endif
-
 #ifdef CONFIG_OPLUS_FEATURE_CPUFREQ_BOUNCING
 	freq = cb_cap(policy, freq);
 #endif
-	if (freq == sg_policy->cached_raw_freq && sg_policy->next_freq != UINT_MAX)
+
+	if (freq == sg_policy->cached_raw_freq && !sg_policy->need_freq_update)
 		return sg_policy->next_freq;
+
+	sg_policy->need_freq_update = false;
 	sg_policy->cached_raw_freq = freq;
 	return cpufreq_driver_resolve_freq(policy, freq);
+#endif
 }
 
 static void sugov_get_util(unsigned long *util, unsigned long *max, int cpu)
@@ -449,19 +476,26 @@ static void sugov_calc_avg_cap(struct sugov_policy *sg_policy, u64 curr_ws,
 
 #ifdef CONFIG_CONTROL_CENTER
 unsigned int cc_cal_next_freq_with_extra_util(
-	struct cpufreq_policy *policy, unsigned int next_freq)
+	struct cpufreq_policy *policy,
+	unsigned int next_freq
+)
 {
-	/* scale util by turbo boost */
 	int type = CCDM_TB_CLUS_0_FREQ_BOOST;
 	unsigned long extra_util = 0;
 
 	switch (policy->cpu) {
+#ifdef CONFIG_RATP
+	case 6: case 7:
+		type = CCDM_TB_CLUS_1_FREQ_BOOST;
+		break;
+#else
 	case 4: case 5: case 6:
 		type = CCDM_TB_CLUS_1_FREQ_BOOST;
 		break;
 	case 7:
 		type = CCDM_TB_CLUS_2_FREQ_BOOST;
 		break;
+#endif
 	}
 
 	extra_util = ccdm_get_hint(type);
@@ -563,32 +597,6 @@ static void aigov_evaluate(struct sugov_cpu* sg_cpu, unsigned long *util, unsign
 }
 #endif
 
-#ifdef CONFIG_CONTROL_CENTER
-static unsigned int sugov_ccdm_decision(
-	int cpu,
-	unsigned long arg1,
-	unsigned long arg2,
-	unsigned long arg3,
-	unsigned long arg4)
-{
-	if (ccdm_enabled()) {
-		int type = CCDM_CLUS_0_CPUFREQ;
-
-		switch (cpu) {
-		case 4: case 5: case 6:
-			type = CCDM_CLUS_1_CPUFREQ;
-			break;
-		case 7:
-			type = CCDM_CLUS_2_CPUFREQ;
-			break;
-		}
-
-		return ccdm_decision(type, arg1, arg2, arg3, arg4);
-	}
-	return arg1;
-}
-#endif
-
 static void sugov_update_single(struct update_util_data *hook, u64 time,
 				unsigned int flags)
 {
@@ -598,6 +606,9 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	unsigned long util, max, hs_util;
 	unsigned int next_f;
 	bool busy;
+#ifdef CONFIG_CONTROL_CENTER
+	struct cpufreq_policy *policy = sg_policy->policy;
+#endif
 
 	flags &= ~SCHED_CPUFREQ_RT_DL;
 	cb_update(sg_policy->policy, time);
@@ -637,13 +648,6 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 					sg_cpu->walt_load.pl, flags);
 		sugov_iowait_boost(sg_cpu, &util, &max);
 		sugov_walt_adjust(sg_cpu, &util, &max);
-#ifdef CONFIG_CONTROL_CENTER
-		if (ccdm_enabled()) {
-			util = sugov_ccdm_decision(
-					sg_cpu->cpu, util,
-					policy->min, policy->max, max);
-		}
-#endif
 		next_f = get_next_freq(sg_policy, util, max);
 		/*
 		 * Do not reduce the frequency if the CPU has not been idle
@@ -652,12 +656,6 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 		if (busy && next_f < sg_policy->next_freq)
 			next_f = sg_policy->next_freq;
 	}
-
-#ifdef CONFIG_CONTROL_CENTER
-		/* keep requested freq */
-		sg_policy->policy->req_freq = next_f;
-		next_f = cc_cal_next_freq_with_extra_util(policy, next_f);
-#endif
 
 	sugov_update_commit(sg_policy, time, next_f);
 	raw_spin_unlock(&sg_policy->update_lock);
@@ -706,13 +704,6 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 		sugov_walt_adjust(j_sg_cpu, &util, &max);
 	}
 
-#ifdef CONFIG_CONTROL_CENTER
-	if (ccdm_enabled()) {
-		util = sugov_ccdm_decision(
-				sg_cpu->cpu, util,
-				policy->min, policy->max, max);
-	}
-#endif
 #ifdef CONFIG_AIGOV
 	aigov_evaluate(last_sg_cpu, &util, &max);
 #endif
@@ -727,6 +718,9 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned long util, max, hs_util;
 	unsigned int next_f;
+#ifdef CONFIG_CONTROL_CENTER
+	struct cpufreq_policy *policy = sg_policy->policy;
+#endif
 
 	if (!sg_policy->tunables->pl && flags & SCHED_CPUFREQ_PL)
 		return;
@@ -765,9 +759,7 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 		else
 			next_f = sugov_next_freq_shared(sg_cpu, time);
 #ifdef CONFIG_CONTROL_CENTER
-			/* keep requested freq */
-			sg_policy->policy->req_freq = next_f;
-			next_f = cc_cal_next_freq_with_extra_util(policy, next_f);
+		next_f = cc_cal_next_freq_with_extra_util(policy, next_f);
 #endif
 		sugov_update_commit(sg_policy, time, next_f);
 	}
@@ -1336,6 +1328,10 @@ static int sugov_start(struct cpufreq_policy *policy)
 	sg_policy->work_in_progress = false;
 	sg_policy->need_freq_update = false;
 	sg_policy->cached_raw_freq = 0;
+
+#ifdef CONFIG_CONTROL_CENTER
+	next_f = cc_cal_next_freq_with_extra_util(policy, next_f);
+#endif
 
 	for_each_cpu(cpu, policy->cpus) {
 		struct sugov_cpu *sg_cpu = &per_cpu(sugov_cpu, cpu);
