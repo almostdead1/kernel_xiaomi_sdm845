@@ -69,6 +69,9 @@ struct sugov_policy {
 	unsigned long avg_cap;
 	unsigned int next_freq;
 	unsigned int cached_raw_freq;
+#ifdef CONFIG_OPLUS_FEATURE_SUGOV_TL
+	unsigned int		cached_raw_laf;
+#endif
 	unsigned long hispeed_util;
 	unsigned long max;
 
@@ -602,7 +605,6 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
-	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned long util, max, hs_util;
 	unsigned int next_f;
 	bool busy;
@@ -715,7 +717,6 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 {
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
-	struct cpufreq_policy *policy = sg_policy->policy;
 	unsigned long util, max, hs_util;
 	unsigned int next_f;
 #ifdef CONFIG_CONTROL_CENTER
@@ -1317,6 +1318,7 @@ static int sugov_start(struct cpufreq_policy *policy)
 {
 	struct sugov_policy *sg_policy = policy->governor_data;
 	unsigned int cpu;
+	unsigned int next_f;
 
 	sg_policy->up_rate_delay_ns =
 		sg_policy->tunables->up_rate_limit_us * NSEC_PER_USEC;
