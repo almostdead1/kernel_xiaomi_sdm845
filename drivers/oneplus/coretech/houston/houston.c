@@ -1947,8 +1947,8 @@ static long ht_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long __us
 			copy_to_user((struct ht_fps_stabilizer_buf __user *) arg, &ht_online_config_buf, PAGE_SIZE);
 		}
 		break;
-	}
-/*	case HT_IOC_FPS_PARTIAL_SYS_INFO:
+/*	}
+	case HT_IOC_FPS_PARTIAL_SYS_INFO:
 	{
 		struct ht_partial_sys_info data;
 		union power_supply_propval prop = {0, };
