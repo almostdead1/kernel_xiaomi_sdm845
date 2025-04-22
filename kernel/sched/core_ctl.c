@@ -57,6 +57,7 @@ struct cluster_data {
 	struct task_struct *core_ctl_thread;
 	unsigned int first_cpu;
 	unsigned int boost;
+	unsigned int op_boost;
 	struct kobject kobj;
 };
 
@@ -542,6 +543,14 @@ static bool adjustment_possible(const struct cluster_data *cluster,
 {
 	return (need < cluster->active_cpus || (need > cluster->active_cpus &&
 						cluster->nr_isolated_cpus));
+}
+#define TRACE_DEBUG 0
+
+static inline void tracing_mark_write(int serial, char *name, unsigned int value)
+{
+#if TRACE_DEBUG
+	trace_printk("C|%d|%s|%u\n", 99990+serial, name, value);
+#endif
 }
 
 static bool eval_need(struct cluster_data *cluster)
