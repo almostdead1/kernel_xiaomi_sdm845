@@ -122,6 +122,7 @@ struct clk_debug_mux {
 	u32 src_sel_shift;
 	u32 post_div_mask;
 	u32 post_div_shift;
+	u32 period_offset;
 	struct clk_hw hw;
 };
 
