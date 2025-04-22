@@ -1795,27 +1795,6 @@ static long ht_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long __us
 		}
 		break;
 	}
-
-		// related to cpu cluster configuration
-		// clus 0
-		data.utils[0] = ht_utils[0].utils[0]? (u64) *(ht_utils[0].utils[0]): 0;
-		data.utils[1] = ht_utils[0].utils[1]? (u64) *(ht_utils[0].utils[1]): 0;
-		data.utils[2] = ht_utils[0].utils[2]? (u64) *(ht_utils[0].utils[2]): 0;
-		data.utils[3] = ht_utils[0].utils[3]? (u64) *(ht_utils[0].utils[3]): 0;
-		// clus 1
-		data.utils[4] = ht_utils[1].utils[0]? (u64) *(ht_utils[1].utils[0]): 0;
-		data.utils[5] = ht_utils[1].utils[1]? (u64) *(ht_utils[1].utils[1]): 0;
-		data.utils[6] = ht_utils[1].utils[2]? (u64) *(ht_utils[1].utils[2]): 0;
-		// clus 2
-		data.utils[7] = ht_utils[2].utils[0]? (u64) *(ht_utils[2].utils[0]): 0;
-
-		// pick skip-therm since not support shell-therm.
-		data.skin_temp = ht_get_temp_delay(HT_THERM_0);
-
-		if (copy_to_user((struct ht_partial_sys_info __user *) arg, &data, sizeof(struct ht_partial_sys_info)))
-			return 0;
-		break;
-	}
 	default:
 	{
 		// handle unsupported ioctl cmd
