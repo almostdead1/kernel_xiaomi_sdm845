@@ -848,10 +848,9 @@ void deactivate_task(struct rq *rq, struct task_struct *p, int flags)
 		clear_ed_task(p, rq);
 
 	dequeue_task(rq, p, flags);
-
 #if defined(CONFIG_CONTROL_CENTER) && defined(CONFIG_IM)
-		if (unlikely(im_ux(p)))
-			restore_user_nice_safe(p);
+	if (unlikely(im_main(p) || im_enqueue(p) || im_render(p)))
+		restore_user_nice_safe(p);
 #endif
 }
 
@@ -2597,6 +2596,7 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 #else
 			p->static_prio = NICE_TO_PRIO(0);
 #endif
+
 		p->prio = p->normal_prio = __normal_prio(p);
 		set_load_weight(p);
 
