@@ -22,6 +22,7 @@ bool opc_check_uxtop_cpu(int uxtop, int cpu);
 bool opc_utask_slave(struct task_struct *t);
 extern unsigned long __init opc_get_orig_capacity(int cpu);
 extern void __exit opc_exit_module(void);
+extern void opc_set_boost(unsigned int val);
 #define UTASK_SLAVE(t) opc_utask_slave(t)
 
 #else
@@ -36,5 +37,6 @@ static inline unsigned long opc_cpu_util(unsigned long util, int cpu, struct tas
 static inline bool opc_fps_check(int lvl) { return false;}
 static inline void opc_add_to_chain(struct task_struct *t) {}
 static inline bool opc_check_uxtop_cpu(int uxtop, int cpu) { return true; }
+static inline void opc_set_boost(unsigned int val) {};
 #endif
 #endif

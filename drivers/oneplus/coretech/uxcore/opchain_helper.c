@@ -33,6 +33,9 @@
 #include "opchain_define.h"
 #include "../drivers/oneplus/coretech/uxcore/core/opchain_proxy.h"
 
+// tedlin@ASTI 2019/06/12 add for CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
+
 #define t_rq(t)		task_rq(t)
 #define c_rq(cpu) 	cpu_rq(cpu)
 
@@ -41,6 +44,16 @@ EXPORT_SYMBOL(uxcore_api);
 
 unsigned int *opc_boost_tl;
 EXPORT_SYMBOL(opc_boost_tl);
+
+unsigned int *opc_boost;
+EXPORT_SYMBOL(opc_boost);
+
+void opc_set_boost(unsigned int val)
+{
+	if (opc_boost)
+		*opc_boost = val;
+}
+EXPORT_SYMBOL(opc_set_boost);
 
 bool is_opc_task(struct task_struct *t, int type)
 {
@@ -52,8 +65,11 @@ EXPORT_SYMBOL(is_opc_task);
 
 void opc_binder_pass(size_t data_size, uint32_t *data, int send)
 {
-	if (uxcore_api.opc_binder_pass_t)
-		uxcore_api.opc_binder_pass_t((void *)t_rq(current), (void *)current, data_size, data, send);
+	if (uxcore_api.opc_binder_pass_t) {
+		if (uxcore_api.opc_binder_pass_t((void *)t_rq(current), (void *)current, data_size, data, send))
+// tedlin@ASTI 2019/06/12 add for CONFIG_HOUSTON
+			ht_perf_notify();
+	}
 }
 EXPORT_SYMBOL(opc_binder_pass);
 

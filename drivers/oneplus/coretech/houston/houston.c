@@ -198,8 +198,6 @@ module_param_named(bat_sample_high_resolution, bat_sample_high_resolution, bool,
 static unsigned long bat_update_period_us = 1000000; // 1 sec
 module_param_named(bat_update_period_us, bat_update_period_us, ulong, 0664);
 
-extern void bq27541_force_update_current(void);
-
 /* fps boost switch */
 static bool fps_boost_enable = true;
 module_param_named(fps_boost_enable, fps_boost_enable, bool, 0664);
@@ -417,22 +415,6 @@ static inline int ht_get_temp(int monitor_idx)
 	}
 
 	return temp;
-}
-
-static inline void ht_update_battery(void)
-{
-	static u64 prev = 0;
-	u64 cur = ktime_to_us(ktime_get());
-
-	if (cur - prev >= bat_update_period_us) {
-		if (bat_sample_high_resolution)
-			bq27541_force_update_current();
-		ht_logv("force update battery info\n");
-		prev = cur;
-	} else if (prev > cur) {
-		prev = cur;
-		ht_logv("fix update battery timestamp\n");
-	}
 }
 
 static inline u64 ht_get_iowait_time(int cpu)
@@ -698,8 +680,6 @@ module_param_cb(fps_boost_strategy, &fps_boost_strategy_ops, NULL, 0664);
 /* fps stabilizer update & online config update */
 static DECLARE_WAIT_QUEUE_HEAD(ht_fps_stabilizer_waitq);
 static char ht_online_config_buf[PAGE_SIZE];
-static bool ht_disable_fps_stabilizer_bat = true;
-module_param_named(disable_fps_stabilizer_bat, ht_disable_fps_stabilizer_bat, bool, 0664);
 
 static int ht_online_config_update_store(const char *buf, const struct kernel_param *kp)
 {
@@ -1636,13 +1616,7 @@ static void ht_collect_system_data(struct ai_parcel *p)
 	p->gpu_freq = gpwr? (int) kgsl_pwrctrl_active_freq(gpwr): 0;
 	ht_query_ddrfreq(&p->ddr_freq);
 	p->ddr_voting = cc_get_expect_ddrfreq();
-	if (bat_query) {
-		ht_update_battery();
-		ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
-		p->volt_now = ret >= 0? prop.intval: 0;
-		ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
-		p->curr_now = ret >= 0? prop.intval: 0;
-	}
+
 	/* utils */
 	p->utils[0] = ht_utils[0].utils[0]? (u64) *(ht_utils[0].utils[0]): 0;
 	p->utils[1] = ht_utils[0].utils[1]? (u64) *(ht_utils[0].utils[1]): 0;
@@ -1821,21 +1795,6 @@ static long ht_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long __us
 		}
 		break;
 	}
-	case HT_IOC_FPS_PARTIAL_SYS_INFO:
-	{
-		struct ht_partial_sys_info data;
-		union power_supply_propval prop = {0, };
-		int ret;
-
-		if (ht_disable_fps_stabilizer_bat) {
-			data.volt = data.curr = 0;
-		} else {
-			ht_update_battery();
-			ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
-			data.volt = ret >= 0? prop.intval: 0;
-			ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
-			data.curr = ret >= 0? prop.intval: 0;
-		}
 
 		// related to cpu cluster configuration
 		// clus 0
@@ -1953,13 +1912,6 @@ static void ht_collect_data(void)
 	monitor.buf->data[idx][HT_UTIL_5] = ht_utils[1].utils[1]? (u64) *(ht_utils[1].utils[1]): 0;
 	monitor.buf->data[idx][HT_UTIL_6] = ht_utils[1].utils[2]? (u64) *(ht_utils[1].utils[2]): 0;
 	monitor.buf->data[idx][HT_UTIL_7] = ht_utils[2].utils[0]? (u64) *(ht_utils[2].utils[0]): 0;
-
-	/* battery part */
-	ht_update_battery();
-	ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
-	monitor.buf->data[idx][HT_BAT_VOLT_NOW] = ret >= 0? prop.intval: 0;
-	ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
-	monitor.buf->data[idx][HT_BAT_CURR_NOW] = ret >= 0? prop.intval: 0;
 
 	/* render & rtg util part*/
 	monitor.buf->data[idx][HT_RENDER_PID] = RenPid;
