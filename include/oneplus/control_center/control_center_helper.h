@@ -35,36 +35,27 @@ struct cc_tsk_data {
 	struct delayed_work dwork;
 };
 
-extern void cc_tsk_init(void* task);
-extern void cc_tsk_free(void* task);
+extern void cc_tsk_init(void *task);
+extern void cc_tsk_disable(void *task);
+extern void cc_tsk_free(void *task);
 
 /* ddr related control */
-extern atomic_t cc_expect_ddrfreq;
-extern bool cc_ddr_boost_enable;
-//extern bool cc_ddr_set_enable;
-//extern bool cc_ddr_lower_bound_enable;
-//extern bool cc_ddr_lock_enable;
-
-//extern u64 cc_cpu_find_ddr(int cpu);
-extern bool cc_is_ddrfreq_related(const char* name);
+extern bool cc_is_ddrfreq_related(const char *name);
 
 /* ddr lock api */
 extern void aop_lock_ddr_freq(int lv);
 
 extern unsigned long cc_get_expect_ddrfreq(void);
-
-#define CC_DDR_LOWER_BOUND 0x0001
-#define CC_DDR_VOTING      0x0002
-#define CC_DDR_CCDM        0x0004
-
-extern bool cc_ddr_config_check(int config);
+extern bool cc_ddr_boost_enabled(void);
 #else
-static inline void cc_tsk_init(void* task) {};
-static inline void cc_tsk_free(void* task) {};
+static inline void cc_tsk_init(void *task) {};
+static inline void cc_tsk_disable(void *task) {};
+static inline void cc_tsk_free(void *task) {};
 
-//extern u64 cc_cpu_find_ddr(int cpu) { return 0; }
-extern bool cc_is_ddrfreq_related(const char* name) { return false; }
-extern bool cc_ddr_config_check(int config) { return false; }
+extern u64 cc_cpu_find_ddr(int cpu) { return 0; }
+extern bool cc_is_ddrfreq_related(const char *name) { return false; }
+extern unsigned long cc_get_expect_ddrfreq(void) { return 0; }
+extern bool cc_ddr_boost_enabled(void) { return false; }
 #endif
 
 #ifdef CONFIG_CONTROL_CENTER
@@ -94,6 +85,7 @@ enum {
 	CCDM_TB_CPU_6_IDLE_BLOCK,
 	CCDM_TB_CPU_7_IDLE_BLOCK,
 	CCDM_TB_IDLE_BLOCK,
+	CCDM_TB_CCTL_BOOST,
 };
 
 /* status check */

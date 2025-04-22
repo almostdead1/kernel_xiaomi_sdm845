@@ -14,9 +14,21 @@
 #endif
 
 #define HT_CLUSTERS 3
+
+#ifndef CONFIG_ARCH_LITO
 #define HT_CPUS_PER_CLUS 4
+#else
+#define HT_CPUS_PER_CLUS 6
+#endif
+
 #define CLUS_0_IDX 0
+
+#ifndef CONFIG_ARCH_LITO
 #define CLUS_1_IDX 4
+#else
+#define CLUS_1_IDX 6
+#endif
+
 #define CLUS_2_IDX 7
 
 #define MIN_POLLING_VAL 5
@@ -104,6 +116,7 @@ enum {
 	HT_CPU_7_1,
 	HT_THERM_0,
 	HT_THERM_1,
+	HT_THERM_2,
 	HT_UTIL_0,
 	HT_UTIL_1,
 	HT_UTIL_2,
@@ -185,7 +198,7 @@ struct ai_parcel {
 	u32 cpu_orig_max_freq_1;
 	u32 gpu_freq;
 	u64 ddr_freq;
-	u64 ddr_voting;
+	u32 ddr_voting;
 	u32 volt_now; // battery part
 	u32 curr_now;
 	u64 queued_ts_us;
@@ -201,8 +214,6 @@ struct ai_parcel {
 #endif
 	struct ai_thread_parcel t[AI_THREAD_PARCEL_MAX];
 };
-
-extern int ohm_get_cur_cpuload(bool ctrl);
 
 /* cpu load info */
 struct cpuload {
