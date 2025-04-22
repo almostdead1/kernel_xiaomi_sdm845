@@ -208,7 +208,7 @@ static void ctech_opc_add_to_chain(void *rq, void *t)
 	ctech_ux_clock_base_mark(rq, t);
 }
 
-static void ctech_opc_binder_parse(void *rq, void *cur,
+static int ctech_opc_binder_parse(void *rq, void *cur,
 		unsigned int dsize,unsigned int *data,
 		int send)
 {
