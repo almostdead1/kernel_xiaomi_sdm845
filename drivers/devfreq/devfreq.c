@@ -260,9 +260,6 @@ int update_devfreq(struct devfreq *devfreq)
 	unsigned long freq, cur_freq;
 	int err = 0;
 	u32 flags = 0;
-#ifdef CONFIG_CONTROL_CENTER
-	unsigned long freq_tmp;
-#endif
 
 	if (!mutex_is_locked(&devfreq->lock)) {
 		WARN(true, "devfreq->lock must be locked by the caller.\n");
@@ -294,14 +291,19 @@ int update_devfreq(struct devfreq *devfreq)
 		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
 	}
 #ifdef CONFIG_CONTROL_CENTER
-	if (cc_ddr_boost_enable) {
+	if (cc_ddr_boost_enabled()) {
 		if (devfreq->dev.cc_marked) {
-			freq_tmp = atomic_read(&cc_expect_ddrfreq);
-			if (freq_tmp)
-				freq = freq_tmp;
+			unsigned long val;
+
+			devfreq->dev.parent->cc_marked = devfreq->dev.cc_marked;
+
+			val = cc_get_expect_ddrfreq();
+			if (val)
+				freq = val;
 		}
 	}
 #endif
+
 	if (devfreq->profile->get_cur_freq)
 		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
 	else
