@@ -1,3 +1,4 @@
+/* decision maker info */
 
 #define CCDM_CLUS_SIZE 3
 #define CCDM_CPU_SIZE 8
@@ -12,11 +13,14 @@ struct ccdm_info {
 
 	long long c_fps_boost_ddrfreq;
 	long long ddrfreq;
+	/* Turbo Boost */
 	long long tb_freq_boost[CCDM_CLUS_SIZE];
 	long long tb_place_boost_hint;
 	long long tb_idle_block_hint[CCDM_CPU_SIZE];
+	long long tb_cctl_boost_hint;
 };
 
+/* expected to public */
 enum {
 	CCDM_DEFAULT = 0,
 	CCDM_CLUS_0_CPUFREQ,
@@ -26,6 +30,7 @@ enum {
 	CCDM_VOTING_DDRFREQ,
 	CCDM_FPS_BOOST_HINT,
 
+	/* Turbo boost */
 	CCDM_TB_CLUS_0_FREQ_BOOST,
 	CCDM_TB_CLUS_1_FREQ_BOOST,
 	CCDM_TB_CLUS_2_FREQ_BOOST,
@@ -41,6 +46,7 @@ enum {
 	CCDM_TB_CPU_6_IDLE_BLOCK,
 	CCDM_TB_CPU_7_IDLE_BLOCK,
 	CCDM_TB_IDLE_BLOCK,
+	CCDM_TB_CCTL_BOOST,
 };
 
 static struct ccdm_info ginfo = {
@@ -59,10 +65,13 @@ static struct ccdm_info ginfo = {
 		CCDM_ULLONG_MAX, CCDM_ULLONG_MAX,
 		CCDM_ULLONG_MAX, CCDM_ULLONG_MAX
 	}, // idle block
+	0,
+
+
 };
 
 /* helper */
-static inline long long clamp(long long val, long long lo, long long hi)
+static inline clamp(long long val, long long lo, long long hi)
 {
 	val = val >= lo ? val : lo;
 	val = val <= hi ? val : hi;
@@ -111,6 +120,9 @@ void ccdm_update_hint_1(int type, long long arg1)
 		break;
 	case CCDM_TB_CPU_7_IDLE_BLOCK:
 		ginfo.tb_idle_block_hint[7] = arg1;
+		break;
+	case CCDM_TB_CCTL_BOOST:
+		ginfo.tb_cctl_boost_hint = arg1;
 		break;
 	}
 }
@@ -194,6 +206,8 @@ long long ccdm_get_hint(int type)
 		return ginfo.tb_idle_block_hint[6];
 	case CCDM_TB_CPU_7_IDLE_BLOCK:
 		return ginfo.tb_idle_block_hint[7];
+	case CCDM_TB_CCTL_BOOST:
+		return ginfo.tb_cctl_boost_hint;
 	}
 	return 0;
 }
@@ -243,6 +257,7 @@ static long long cpufreq_decision(int type,
 	target = ginfo.c_max[clus_idx];
 
 	if (target == 0 || target == 2147483647 /* INT_MAX */) {
+		/* no cpufreq adjust, only take care of fps boost case */
 		util += extra_util;
 		util = util > max_util ? max_util : util;
 		return util;
@@ -279,6 +294,7 @@ static long long ddrfreq_voting_decision(int type,
 	long long arg3,
 	long long arg4)
 {
+	/* TODO add mapping table */
 	return ginfo.ddrfreq;
 }
 
@@ -364,6 +380,7 @@ void ccdm_get_status(void *ptr)
 	ccdm->ddrfreq = ginfo.ddrfreq;
 	ccdm->c_fps_boost_ddrfreq = ginfo.c_fps_boost_ddrfreq;
 	ccdm->tb_place_boost_hint = ginfo.tb_place_boost_hint;
+	ccdm->tb_cctl_boost_hint = ginfo.tb_cctl_boost_hint;
 
 	for (i = 0; i < CCDM_CPU_SIZE; ++i)
 		ccdm->tb_idle_block_hint[i] = ginfo.tb_idle_block_hint[i];
@@ -377,12 +394,16 @@ void ccdm_reset(void)
 		ginfo.c_min[i] = 0;
 		ginfo.c_max[i] = 0;
 		ginfo.c_fps_boost[i] = 0;
+		/* leave default config not change */
+		//ginfo.trust[i] = 100;
+		//ginfo.weight[i] = 100;
 		ginfo.tb_freq_boost[i] = 0;
 	}
 	ginfo.fps_boost_hint = 0;
 	ginfo.ddrfreq = 0;
 	ginfo.c_fps_boost_ddrfreq = 0;
 	ginfo.tb_place_boost_hint = 0;
+	ginfo.tb_cctl_boost_hint = 0;
 
 	for (i = 0; i < CCDM_CPU_SIZE; ++i)
 		ginfo.tb_idle_block_hint[i] = CCDM_ULLONG_MAX;

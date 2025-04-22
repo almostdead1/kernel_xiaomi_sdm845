@@ -21,10 +21,6 @@
 #include <linux/clk.h>
 #include <linux/jiffies.h>
 
-#ifdef CONFIG_AIGOV
-#include <linux/oem/aigov.h>
-#endif
-
 #include "../drivers/gpu/msm/kgsl.h"
 #include "../drivers/gpu/msm/kgsl_pwrctrl.h"
 
@@ -40,9 +36,7 @@
 #include <linux/oem/control_center.h>
 #endif
 
-#ifdef CONFIG_IM
 #include <linux/oem/im.h>
-#endif
 #include <../kernel/sched/sched.h>
 
 /* perf raw counter */
@@ -62,7 +56,7 @@ static const char *ht_monitor_case[HT_MONITOR_SIZE] = {
 	"cpu-0-0-usr", "cpu-0-1-usr", "cpu-0-2-usr", "cpu-0-3-usr",
 	"cpu-1-0-usr", "cpu-1-1-usr", "cpu-1-2-usr", "cpu-1-3-usr",
 	"cpu-1-4-usr", "cpu-1-5-usr", "cpu-1-6-usr", "cpu-1-7-usr",
-	"skin-therm", "skin-msm-therm",
+	"shell_front", "shell_frame", "shell_back",
 	"util-0", "util-1", "util-2", "util-3", "util-4",
 	"util-5", "util-6", "util-7",
 	"process name", "layer name", "pid", "fps_align", "actualFps",
@@ -105,11 +99,13 @@ module_param_named(render_pid, render_pid, int, 0664);
 static int game_fps_pid = -1;
 module_param_named(game_fps_pid, game_fps_pid, int, 0664);
 
+static int pccore_always_on;
+module_param_named(pcc_always_on, pccore_always_on, int, 0664);
 /* pmu */
 static int perf_ready = -1;
 
 #ifdef CONFIG_ONEPLUS_FG_OPT
-unsigned int ht_fuse_boost = 2;
+unsigned int ht_fuse_boost = 0;
 module_param_named(fuse_boost, ht_fuse_boost, uint, 0664);
 #endif
 
@@ -198,6 +194,8 @@ module_param_named(bat_sample_high_resolution, bat_sample_high_resolution, bool,
 static unsigned long bat_update_period_us = 1000000; // 1 sec
 module_param_named(bat_update_period_us, bat_update_period_us, ulong, 0664);
 
+//extern void bq27541_force_update_current(void);
+
 /* fps boost switch */
 static bool fps_boost_enable = true;
 module_param_named(fps_boost_enable, fps_boost_enable, bool, 0664);
@@ -252,6 +250,7 @@ struct ht_monitor {
 	.buf = NULL,
 };
 
+/* MUST FIX: CPU deployment by different platform */
 struct ht_util_pol {
 	unsigned long *utils[HT_CPUS_PER_CLUS];
 	unsigned long *hi_util;
@@ -294,6 +293,7 @@ static atomic_t cached_fps[2];
 static int ht_tzd_idx = HT_CPU_0;
 static struct kgsl_pwrctrl *gpwr;
 static unsigned int sample_rate = 3000;
+/* MUST FIX: CPU deployment by different platform */
 static struct ht_util_pol ht_utils[HT_CLUSTERS];
 
 static bool __read_mostly keep_alive = false;
@@ -325,11 +325,11 @@ static inline int clus_to_cpu(int clus)
 
 static inline u64 ddr_find_target(u64 target) {
 	int i;
-	u64 ddr_options[11] = {
-		200, 300, 451, 547, 681, 768, 1017, 1353, 1555, 1804, 2092
+	u64 ddr_options[12] = {
+		200, 300, 451, 547, 681, 768, 1017, 1353, 1555, 1804, 2092, 2736
 	};
 
-	for (i = 10; i >= 0; --i) {
+	for (i = 11; i >= 0; --i) {
 		if (target >= ddr_options[i]) {
 			target = ddr_options[i];
 			break;
@@ -348,6 +348,7 @@ static inline void ht_query_ddrfreq(u64* val)
 	else if (*val == 1355) *val = 1353;
 	else if (*val == 1805) *val = 1804;
 	else if (*val == 2096) *val = 2092;
+	else if (*val == 2739) *val = 2736;
 }
 
 static inline int ht_next_sample_idx(void)
@@ -416,7 +417,23 @@ static inline int ht_get_temp(int monitor_idx)
 
 	return temp;
 }
+/*****
+static inline void ht_update_battery(void)
+{
+	static u64 prev = 0;
+	u64 cur = ktime_to_us(ktime_get());
 
+	if (cur - prev >= bat_update_period_us) {
+		if (bat_sample_high_resolution)
+			bq27541_force_update_current();
+		ht_logv("force update battery info\n");
+		prev = cur;
+	} else if (prev > cur) {
+		prev = cur;
+		ht_logv("fix update battery timestamp\n");
+	}
+}
+*****/
 static inline u64 ht_get_iowait_time(int cpu)
 {
 	u64 iowait, iowait_usecs = -1ULL;
@@ -487,7 +504,7 @@ static unsigned int ht_get_temp_delay(int idx)
 	static unsigned int temps[HT_MONITOR_SIZE] = {0};
 
 	/* only allow for reading sensor data */
-	if (unlikely(idx < HT_CPU_0 || idx > HT_THERM_1))
+	if (unlikely(idx < HT_CPU_0 || idx > HT_THERM_2))
 		return 0;
 
 	/* update */
@@ -680,6 +697,8 @@ module_param_cb(fps_boost_strategy, &fps_boost_strategy_ops, NULL, 0664);
 /* fps stabilizer update & online config update */
 static DECLARE_WAIT_QUEUE_HEAD(ht_fps_stabilizer_waitq);
 static char ht_online_config_buf[PAGE_SIZE];
+static bool ht_disable_fps_stabilizer_bat = true;
+module_param_named(disable_fps_stabilizer_bat, ht_disable_fps_stabilizer_bat, bool, 0664);
 
 static int ht_online_config_update_store(const char *buf, const struct kernel_param *kp)
 {
@@ -852,10 +871,10 @@ void ht_collect_perf_data(struct work_struct *work)
 		 * 3. enter frequency not higher than threshold
 		 */
 		if (parcel.queued_ts_us - rtg_task->rtg_ts >= 1000000 /* 1 sec */ ||
-				rtg_task->ravg.demand < base_util ||
+				rtg_task->ravg.demand_scaled < base_util ||
 				rtg_task->rtg_peak < rtg_filter_cnt) {
 			list_del_init(&rtg_task->rtg_node);
-			im_unset_flag(rtg_task, IM_UX);
+			im_unset_flag(rtg_task, IM_ENQUEUE);
 			continue;
 		}
 
@@ -1033,86 +1052,7 @@ static void do_fps_boost(unsigned int val, unsigned int period_us)
 	struct task_struct *t;
 	u64 prev_ddr_target = 100;
 	u64 ddr_target = 100; /* default value */
-	//struct cc_command cc;
-
-	if (!fps_boost_enable && !fps_boost_force_enable)
-		return;
-
-	if (ccdm_enabled()) {
-		struct cc_command cc;
-
-		/* cpufreq part */
-		if (val > 0) {
-			for (i = 0; i < FPS_TARGET_NUM; ++i) {
-				if (boost_target[i] <= 0)
-					continue;
-				rcu_read_lock();
-				t = find_task_by_vpid(boost_target[i]);
-				if (t) {
-					++boost_cluster[cpu_to_clus(t->cpu)];
-					ht_logv(
-						"boost default target task %d %s on cpu %d\n",
-						t->pid, t->comm, t->cpu);
-				}
-				rcu_read_unlock();
-			}
-
-			atomic_inc(&boost_cnt);
-		}
-
-		/* ddrfreq part */
-
-		/* setup command */
-		memset(&cc, 0, sizeof(struct cc_command));
-		cc.pid = current->pid;
-		cc.prio = CC_PRIO_HIGH;
-		cc.period_us = period_us;
-		cc.group = CC_CTL_GROUP_GRAPHIC;
-		cc.category = CC_CTL_CATEGORY_FPS_BOOST;
-		cc.response = 0;
-		cc.leader = current->tgid;
-		cc.bind_leader = true;
-		cc.status = 0;
-		cc.type = val ? CC_CTL_TYPE_PERIOD : CC_CTL_TYPE_RESET;
-		for (i = 0; i < HT_CLUSTERS; ++i) {
-			if (boost_cluster[i])
-				cc.params[i] = val; // clus hint
-		}
-		cc.params[3] = 0; // TBD, do we still need ddr boost?
-
-		cc_tsk_process(&cc);
-		return;
-	}
-
-#ifdef CONFIG_AIGOV
-	if (aigov_hooked()) {
-		if (val > 0) {
-			int cpu = -1;
-			rcu_read_lock();
-			t = find_task_by_vpid(boost_target[i]);
-			if (t)
-				cpu = t->cpu;
-			rcu_read_unlock();
-
-			aigov_inc_boost_hint(cpu);
-			aigov_update_util(cpu_to_clus(cpu));
-		} else {
-			/* FIXME
-			 * here we will reset, but aigov_hook in fps_boost case
-			 * not queue into control, so there is no delay work to do
-			 * reset, if fps_boost doesn't call reset, then boost hint
-			 * will not change.
-			 */
-			aigov_reset_boost_hint(0);
-			aigov_reset_boost_hint(4);
-			aigov_reset_boost_hint(7);
-			aigov_update_util(0);
-			aigov_update_util(1);
-			aigov_update_util(2);
-		}
-		return;
-	}
-#endif
+	struct cc_command cc;
 
 	ht_logv("boost handler: %llu\n", val);
 
@@ -1161,38 +1101,38 @@ static void do_fps_boost(unsigned int val, unsigned int period_us)
 		do_cpufreq_boost_helper(CLUS_2_IDX, val, period_us, orig, cur);
 	}
 
-	///* boost ddrfreq */
-	//if (ais_active) {
-	//	/* setup boost command */
-	//	cc.pid = current->pid;
-	//	cc.prio = CC_PRIO_HIGH;
-	//	cc.period_us = period_us;
-	//	cc.group = CC_CTL_GROUP_GRAPHIC;
-	//	cc.category = CC_CTL_CATEGORY_DDR_FREQ;
-	//	cc.response = 0;
-	//	cc.leader = current->tgid;
-	//	cc.bind_leader = true;
-	//	cc.status = 0;
-	//	cc.type = CC_CTL_TYPE_ONESHOT_NONBLOCK;
+	/* boost ddrfreq */
+	if (ais_active) {
+		/* setup boost command */
+		cc.pid = current->pid;
+		cc.prio = CC_PRIO_HIGH;
+		cc.period_us = period_us;
+		cc.group = CC_CTL_GROUP_GRAPHIC;
+		cc.category = CC_CTL_CATEGORY_DDR_VOTING_FREQ;
+		cc.response = 0;
+		cc.leader = current->tgid;
+		cc.bind_leader = true;
+		cc.status = 0;
+		cc.type = CC_CTL_TYPE_ONESHOT_NONBLOCK;
 
-	//	if (val > 0) {
-	//		clk_get_ddr_freq(&prev_ddr_target);
-	//		ddr_target = prev_ddr_target;
-	//		ddr_target /= 1000000;
-	//		ddr_target *= 2;
-	//		ddr_target = ddr_find_target(ddr_target);
-	//		prev_ddr_target = ddr_find_target(prev_ddr_target/1000000);
-	//		if (ddrfreq_hispeed_enable && ddrfreq_hispeed > ddr_target) {
-	//			ht_logv("boost ddr hispeed from %u to %u\n", ddr_target, ddrfreq_hispeed);
-	//			ddr_target = ddrfreq_hispeed;
-	//		}
-	//		cc.params[0] = ddr_target;
-	//		cc_tsk_process(&cc);
-	//	} else {
-	//		cc.type = CC_CTL_TYPE_RESET_NONBLOCK;
-	//		cc_tsk_process(&cc);
-	//	}
-	//}
+		if (val > 0) {
+			clk_get_ddr_freq(&prev_ddr_target);
+			ddr_target = prev_ddr_target;
+			ddr_target /= 1000000;
+			ddr_target *= 2;
+			ddr_target = ddr_find_target(ddr_target);
+			prev_ddr_target = ddr_find_target(prev_ddr_target/1000000);
+			if (ddrfreq_hispeed_enable && ddrfreq_hispeed > ddr_target) {
+				ht_logv("boost ddr hispeed from %u to %u\n", ddr_target, ddrfreq_hispeed);
+				ddr_target = ddrfreq_hispeed;
+			}
+			cc.params[0] = ddr_target;
+			cc_tsk_process(&cc);
+		} else {
+			cc.type = CC_CTL_TYPE_RESET_NONBLOCK;
+			cc_tsk_process(&cc);
+		}
+	}
 
 	if (val > 0) {
 		for (i = 0; i < HT_CLUSTERS; ++i) {
@@ -1216,8 +1156,10 @@ static int ht_fps_boost_store(const char *buf, const struct kernel_param *kp)
 	int ret;
 	u64 now;
 
-	if (!fps_boost_enable && !fps_boost_force_enable)
-		return 0;
+	if (!fps_boost_force_enable) {
+		if (!fps_boost_enable)
+			return 0;
+	}
 
 	ret = sscanf(buf, "%u,%u,%u,%u,%u\n", &vals[0], &vals[1], &vals[2], &vals[3], &vals[4]);
 	if (ret != 5) {
@@ -1271,27 +1213,150 @@ static struct kernel_param_ops ht_fps_boost_ops = {
 };
 module_param_cb(fps_boost, &ht_fps_boost_ops, NULL, 0220);
 
-static inline void tb_parse_req(
+inline void tb_parse_req_v2(
+	unsigned int tb_pol,
+	unsigned int tb_type,
+	unsigned int *args,
+	int size)
+{
+	struct cc_command cc;
+
+	if (!fps_boost_force_enable) {
+		if (!fps_boost_enable)
+			return;
+		if (!tb_enable)
+			return;
+	}
+
+	if (tb_pol == TB_POL_HWUI_BOOST && !ht_hwui_boost_enable) {
+		ht_logv("turbo boost: hwui boost not enable\n");
+		return;
+	}
+
+	ht_logv("turbo boost params: %u %u %u %u %u %u %u %u, from %s %d\n",
+		tb_pol, tb_type, args[0], args[1], args[2], args[3], args[4], args[5],
+		current->comm, current->pid);
+
+	/* first deal with tagging request */
+	if (tb_pol == TB_POL_HOOK_API) {
+		im_set_flag_current(1 << args[0]);
+		return;
+	}
+
+	/* init default turbo boost command */
+	memset(&cc, 0, sizeof(struct cc_command));
+	cc.pid = current->pid;
+	cc.prio = CC_PRIO_HIGH;
+	cc.period_us = args[4] * 1000; /* us*/
+	cc.group = CC_CTL_GROUP_GRAPHIC;
+	cc.response = 0;
+	cc.status = 0;
+	cc.type = CC_CTL_TYPE_PERIOD_NONBLOCK;
+	/* compatible with old freq boost */
+	cc.params[3] = 1;
+	cc.category = CC_CTL_CATEGORY_TB_FREQ_BOOST;
+
+	switch (tb_type) {
+	case TB_TYPE_FREQ_BOOST:
+		{
+			int util = args[5];
+			int i;
+
+			cc.leader = current->pid;
+			cc.bind_leader = false;
+
+			if (util > 0) {
+				/* TODO warp find cpus via tasks */
+				int boost_cluster[HT_CLUSTERS] = {0};
+				struct task_struct *t = NULL;
+
+				/* hwui part */
+				rcu_read_lock();
+				for (i = 0; i < 4; ++i) {
+					/* only take case while pid is given */
+					if (args[i]) {
+						t = find_task_by_vpid(args[i]);
+						if (t) {
+							++boost_cluster[cpu_to_clus(t->cpu)];
+							cc_set_cpu_idle_block(t->cpu);
+						}
+					}
+				}
+				rcu_read_unlock();
+
+				for (i = 0; i < HT_CLUSTERS; ++i) {
+					cc.params[0] =
+						boost_cluster[i] ? util : 0;
+					if (cc.params[0]) {
+						switch (i) {
+						case 0:
+							cc.category = CC_CTL_CATEGORY_CLUS_0_FREQ;
+							break;
+						case 1:
+							cc.category = CC_CTL_CATEGORY_CLUS_1_FREQ;
+							break;
+						case 2:
+							cc.category = CC_CTL_CATEGORY_CLUS_2_FREQ;
+							break;
+						}
+						cc_tsk_process(&cc);
+					}
+				}
+
+				/* update boost statistic */
+				atomic_inc(&boost_cnt);
+			} else {
+				cc.type = CC_CTL_TYPE_RESET_NONBLOCK;
+				for (i = 0; i < HT_CLUSTERS; ++i) {
+					cc.params[0] = 0;
+					switch (i) {
+					case 0:
+						cc.category = CC_CTL_CATEGORY_CLUS_0_FREQ;
+						break;
+					case 1:
+						cc.category = CC_CTL_CATEGORY_CLUS_1_FREQ;
+						break;
+					case 2:
+						cc.category = CC_CTL_CATEGORY_CLUS_2_FREQ;
+						break;
+					}
+					cc_tsk_process(&cc);
+				}
+			}
+		}
+		return;
+	case TB_TYPE_PLACE_BOOST:
+		cc.category = CC_CTL_CATEGORY_TB_PLACE_BOOST;
+		break;
+	case TB_TYPE_TAGGING:
+		return;
+	case TB_TYPE_CORECTL_BOOST:
+		cc.category = CC_CTL_CATEGORY_TB_CORECTL_BOOST;
+		if (args[0]) // core control boost level
+			cc.params[0] = args[0];
+		break;
+	default:
+		ht_logw("turbo boost not support this type %u\n", tb_type);
+		return;
+	}
+
+	cc_tsk_process(&cc);
+}
+
+inline void tb_parse_req(
 	unsigned int tb_pol,
 	unsigned int tb_type,
 	unsigned int args[4])
 {
 	struct cc_command cc;
 
+	ht_logv("turbo boost params: %u %u %u %u %u %u, from %s %d\n",
+		tb_pol, tb_type, args[0], args[1], args[2], args[3],
+		current->comm, current->pid);
+
 	/* first deal with tagging request */
 	if (tb_pol == TB_POL_HOOK_API) {
-		switch (args[0]) {
-		case 0:
-			im_set_flag_current(IM_GL);
-			break;
-		case 1:
-			im_set_flag_current(IM_VK);
-			break;
-		default:
-			ht_logw("turbo boost not support this tag %u\n",
-				args[0]);
-			break;
-		}
+		im_set_flag_current(1 << args[0]);
 		return;
 	}
 
@@ -1303,7 +1368,8 @@ static inline void tb_parse_req(
 	cc.group = CC_CTL_GROUP_GRAPHIC;
 	cc.response = 0;
 	cc.status = 0;
-	cc.type = CC_CTL_TYPE_PERIOD;
+	cc.type = CC_CTL_TYPE_PERIOD_NONBLOCK;
+	cc.params[3] = 1;
 
 	switch (tb_pol) {
 	case TB_POL_FPS_BOOST:
@@ -1324,6 +1390,7 @@ static inline void tb_parse_req(
 	case TB_TYPE_FREQ_BOOST:
 		{
 			int util = args[3];
+			int i;
 
 			cc.leader = current->tgid;
 			cc.bind_leader = true;
@@ -1332,33 +1399,69 @@ static inline void tb_parse_req(
 				/* TODO warp find cpus via tasks */
 				int boost_cluster[HT_CLUSTERS] = {0};
 				struct task_struct *t = NULL;
-				int i;
 
 				rcu_read_lock();
 
-				t = find_task_by_vpid(args[0]);
-				if (t) {
-					++boost_cluster[cpu_to_clus(t->cpu)];
-					cc_set_cpu_idle_block(t->cpu);
+				/* sf part */
+				if (args[0]) {
+					t = find_task_by_vpid(args[0]);
+					if (t) {
+						++boost_cluster[cpu_to_clus(t->cpu)];
+						cc_set_cpu_idle_block(t->cpu);
+					}
 				}
-				t = find_task_by_vpid(args[1]);
-				if (t) {
-					++boost_cluster[cpu_to_clus(t->cpu)];
-					cc_check_renice((void *) t);
-					cc_set_cpu_idle_block(t->cpu);
+				/* render part */
+				if (args[1]) {
+					t = find_task_by_vpid(args[1]);
+					if (t) {
+						++boost_cluster[cpu_to_clus(t->cpu)];
+						cc_check_renice((void *) t);
+						cc_set_cpu_idle_block(t->cpu);
+					}
 				}
 				rcu_read_unlock();
 
-				for (i = 0; i < HT_CLUSTERS; ++i)
-					cc.params[i] =
+				for (i = 0; i < HT_CLUSTERS; ++i) {
+					cc.params[0] =
 						boost_cluster[i] ? util : 0;
+					if (cc.params[0]) {
+						switch (i) {
+						case 0:
+							cc.category = CC_CTL_CATEGORY_CLUS_0_FREQ;
+							break;
+						case 1:
+							cc.category = CC_CTL_CATEGORY_CLUS_1_FREQ;
+							break;
+						case 2:
+							cc.category = CC_CTL_CATEGORY_CLUS_2_FREQ;
+							break;
+						}
+						cc_tsk_process(&cc);
+					}
+				}
 
 				/* update boost statistic */
 				atomic_inc(&boost_cnt);
-			} else
-				cc.type = CC_CTL_TYPE_RESET;
+			} else {
+				cc.type = CC_CTL_TYPE_RESET_NONBLOCK;
+				for (i = 0; i < HT_CLUSTERS; ++i) {
+					cc.params[0] = 0;
+					switch (i) {
+					case 0:
+						cc.category = CC_CTL_CATEGORY_CLUS_0_FREQ;
+						break;
+					case 1:
+						cc.category = CC_CTL_CATEGORY_CLUS_1_FREQ;
+						break;
+					case 2:
+						cc.category = CC_CTL_CATEGORY_CLUS_2_FREQ;
+						break;
+					}
+					cc_tsk_process(&cc);
+				}
+			}
 		}
-		break;
+		return;
 	case TB_TYPE_PLACE_BOOST:
 		break;
 	case TB_TYPE_TAGGING:
@@ -1380,7 +1483,8 @@ static int tb_ctl_store(const char *buf, const struct kernel_param *kp)
 {
 	unsigned int tb_pol = 0;
 	unsigned int tb_type = 0;
-	unsigned int args[4] = {0};
+	unsigned int args[6] = {0};
+	int ret;
 
 	if (!fps_boost_force_enable) {
 		if (!fps_boost_enable)
@@ -1389,18 +1493,25 @@ static int tb_ctl_store(const char *buf, const struct kernel_param *kp)
 			return 0;
 	}
 
-	if (sscanf(buf, "%u,%u,%u,%u,%u,%u\n",
+	ret = sscanf(buf, "%u,%u,%u,%u,%u,%u,%u,%u\n",
 		&tb_pol, &tb_type,
-		&args[0], &args[1], &args[2], &args[3]) != 6) {
-		ht_loge("turbo boost params invalid. %s. IGNORED.\n", buf);
+		&args[0], &args[1], &args[2], &args[3], &args[4], &args[5]);
+	if (ret != 6 && ret != 8) {
+		ht_loge("turbo boost params invalid. %d, %s. IGNORED.\n", ret, buf);
 		return 0;
 	}
 
-	ht_logv("turbo boost params: %u %u %u %u %u %u, from %s %d\n",
-		tb_pol, tb_type, args[0], args[1], args[2], args[3],
-		current->comm, current->pid);
+	//ht_logv("turbo boost params: %u %u %u %u %u %u %u %u, from %s %d\n",
+	//	tb_pol, tb_type, args[0], args[1], args[2], args[3], args[4], args[5],
+	//	current->comm, current->pid);
 
-	tb_parse_req(tb_pol, tb_type, args);
+	if (tb_pol == TB_POL_HWUI_BOOST) {
+		tb_parse_req_v2(tb_pol, tb_type, args, 6);
+	} else {
+		unsigned int v[4] = {0};
+		memcpy(v, args, sizeof(unsigned int) * 4);
+		tb_parse_req(tb_pol, tb_type, v);
+	}
 
 	return 0;
 }
@@ -1422,8 +1533,13 @@ void ht_register_cpu_util(unsigned int cpu, unsigned int first_cpu,
 	struct ht_util_pol *hus;
 
 	switch (first_cpu) {
+#ifndef CONFIG_ARCH_LITO
 	case 0: case 1: case 2: case 3: hus = &ht_utils[0]; break;
 	case 4: case 5: case 6: hus = &ht_utils[1]; break;
+#else
+	case 0: case 1: case 2: case 3: case 4: case 5: hus = &ht_utils[0]; break;
+	case 6: hus = &ht_utils[1]; break;
+#endif
 	case 7: hus = &ht_utils[2]; break;
 	default:
 		/* should not happen */
@@ -1431,7 +1547,11 @@ void ht_register_cpu_util(unsigned int cpu, unsigned int first_cpu,
 		return;
 	}
 
+#ifndef CONFIG_ARCH_LITO
 	if (cpu == CLUS_2_IDX)
+#else
+	if (cpu == CLUS_1_IDX || cpu == CLUS_2_IDX)
+#endif
 		cpu = 0;
 	else
 		cpu %= HT_CPUS_PER_CLUS;
@@ -1474,12 +1594,18 @@ void ht_register_thermal_zone_device(struct thermal_zone_device *tzd)
 	/* tzd is guaranteed has value */
 	ht_logi("tzd: %s id: %d\n", tzd->type, tzd->id);
 	idx = ht_mapping_tags(tzd->type);
-	if (idx > HT_THERM_1)
+
+	if (idx > HT_THERM_2)
 		return;
-	if (ht_tzd_idx <= HT_THERM_1) {
+	if (ht_tzd_idx <= HT_THERM_2 && !monitor.tzd[idx]) {
 		++ht_tzd_idx;
 		monitor.tzd[idx] = tzd;
 	}
+}
+
+int ht_pcc_alwayson(void)
+{
+	return pccore_always_on;
 }
 
 void ht_register_power_supply(struct power_supply *psy)
@@ -1616,15 +1742,27 @@ static void ht_collect_system_data(struct ai_parcel *p)
 	p->gpu_freq = gpwr? (int) kgsl_pwrctrl_active_freq(gpwr): 0;
 	ht_query_ddrfreq(&p->ddr_freq);
 	p->ddr_voting = cc_get_expect_ddrfreq();
-
+/*	if (bat_query) {
+		ht_update_battery();
+		ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
+		p->volt_now = ret >= 0? prop.intval: 0;
+		ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
+		p->curr_now = ret >= 0? prop.intval: 0; */
+	}
 	/* utils */
 	p->utils[0] = ht_utils[0].utils[0]? (u64) *(ht_utils[0].utils[0]): 0;
 	p->utils[1] = ht_utils[0].utils[1]? (u64) *(ht_utils[0].utils[1]): 0;
 	p->utils[2] = ht_utils[0].utils[2]? (u64) *(ht_utils[0].utils[2]): 0;
 	p->utils[3] = ht_utils[0].utils[3]? (u64) *(ht_utils[0].utils[3]): 0;
+#ifndef CONFIG_ARCH_LITO
 	p->utils[4] = ht_utils[1].utils[0]? (u64) *(ht_utils[1].utils[0]): 0;
 	p->utils[5] = ht_utils[1].utils[1]? (u64) *(ht_utils[1].utils[1]): 0;
 	p->utils[6] = ht_utils[1].utils[2]? (u64) *(ht_utils[1].utils[2]): 0;
+#else
+	p->utils[4] = ht_utils[0].utils[4]? (u64) *(ht_utils[0].utils[4]): 0;
+	p->utils[5] = ht_utils[0].utils[5]? (u64) *(ht_utils[0].utils[5]): 0;
+	p->utils[6] = ht_utils[1].utils[0]? (u64) *(ht_utils[1].utils[0]): 0;
+#endif
 	p->utils[7] = ht_utils[2].utils[0]? (u64) *(ht_utils[2].utils[0]): 0;
 
 	for (i = 0; i < HT_CLUSTERS; ++i)
@@ -1668,6 +1806,12 @@ static inline void ht_cpuload_helper(int clus, int cpus, struct cpuload_info *cl
 	}
 }
 
+static inline void ht_dump_parcel(struct ai_parcel *p)
+{
+	ht_logv("%s: dump pid %u fps %u volt %llu current %llu skin %lu\n",
+		__func__, p->pid, p->fps, p->volt_now, p->curr_now, p->skin_temp);
+}
+
 static long ht_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long __user arg)
 {
 	if (_IOC_TYPE(cmd) != HT_IOC_MAGIC) return 0;
@@ -1682,6 +1826,7 @@ static long ht_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long __us
 		schedule();
 		finish_wait(&ht_perf_waitq, &wait);
 		ht_collect_system_data(&parcel);
+		ht_dump_parcel(&parcel);
 		if (copy_to_user((struct ai_parcel __user *) arg, &parcel, sizeof(parcel)))
 			return 0;
 		break;
@@ -1751,10 +1896,18 @@ static long ht_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long __us
 			if (clus & (1 << i)) {
 				switch (i) {
 					case 0:
+#ifndef CONFIG_ARCH_LITO
 						ht_cpuload_helper(0, 4, &cli);
+#else
+						ht_cpuload_helper(0, 6, &cli);
+#endif
 						break;
 					case 1:
+#ifndef CONFIG_ARCH_LITO
 						ht_cpuload_helper(1, 3, &cli);
+#else
+						ht_cpuload_helper(1, 1, &cli);
+#endif
 						break;
 					case 2:
 						ht_cpuload_helper(2, 1, &cli);
@@ -1794,6 +1947,44 @@ static long ht_ctl_ioctl(struct file *file, unsigned int cmd, unsigned long __us
 			copy_to_user((struct ht_fps_stabilizer_buf __user *) arg, &ht_online_config_buf, PAGE_SIZE);
 		}
 		break;
+	}
+/*	case HT_IOC_FPS_PARTIAL_SYS_INFO:
+	{
+		struct ht_partial_sys_info data;
+		union power_supply_propval prop = {0, };
+		int ret;
+
+		if (ht_disable_fps_stabilizer_bat) {
+			data.volt = data.curr = 0;
+		} else {
+			ht_update_battery();
+			ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
+			data.volt = ret >= 0? prop.intval: 0;
+			ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
+			data.curr = ret >= 0? prop.intval: 0;
+		}
+
+		// related to cpu cluster configuration
+		// clus 0
+		data.utils[0] = ht_utils[0].utils[0]? (u64) *(ht_utils[0].utils[0]): 0;
+		data.utils[1] = ht_utils[0].utils[1]? (u64) *(ht_utils[0].utils[1]): 0;
+		data.utils[2] = ht_utils[0].utils[2]? (u64) *(ht_utils[0].utils[2]): 0;
+		data.utils[3] = ht_utils[0].utils[3]? (u64) *(ht_utils[0].utils[3]): 0;
+		// clus 1
+		data.utils[4] = ht_utils[1].utils[0]? (u64) *(ht_utils[1].utils[0]): 0;
+		data.utils[5] = ht_utils[1].utils[1]? (u64) *(ht_utils[1].utils[1]): 0;
+		data.utils[6] = ht_utils[1].utils[2]? (u64) *(ht_utils[1].utils[2]): 0;
+		// clus 2
+		data.utils[7] = ht_utils[2].utils[0]? (u64) *(ht_utils[2].utils[0]): 0;
+
+		// pick highest temp
+		data.skin_temp = max(ht_get_temp_delay(HT_THERM_0),
+							max(ht_get_temp_delay(HT_THERM_1),
+								ht_get_temp_delay(HT_THERM_2)));
+
+		if (copy_to_user((struct ht_partial_sys_info __user *) arg, &data, sizeof(struct ht_partial_sys_info)))
+			return 0;
+		break; */
 	}
 	default:
 	{
@@ -1851,6 +2042,7 @@ static void ht_collect_data(void)
 	monitor.buf->data[idx][HT_CPU_7_1] = ht_get_temp(HT_CPU_7_1);
 	monitor.buf->data[idx][HT_THERM_0] = ht_get_temp(HT_THERM_0);
 	monitor.buf->data[idx][HT_THERM_1] = ht_get_temp(HT_THERM_1);
+	monitor.buf->data[idx][HT_THERM_2] = ht_get_temp(HT_THERM_2);
 
 	/* cpu part */
 	pol = cpufreq_cpu_get(CLUS_0_IDX);
@@ -1887,10 +2079,23 @@ static void ht_collect_data(void)
 	monitor.buf->data[idx][HT_UTIL_1] = ht_utils[0].utils[1]? (u64) *(ht_utils[0].utils[1]): 0;
 	monitor.buf->data[idx][HT_UTIL_2] = ht_utils[0].utils[2]? (u64) *(ht_utils[0].utils[2]): 0;
 	monitor.buf->data[idx][HT_UTIL_3] = ht_utils[0].utils[3]? (u64) *(ht_utils[0].utils[3]): 0;
+#ifndef CONFIG_ARCH_LITO
 	monitor.buf->data[idx][HT_UTIL_4] = ht_utils[1].utils[0]? (u64) *(ht_utils[1].utils[0]): 0;
 	monitor.buf->data[idx][HT_UTIL_5] = ht_utils[1].utils[1]? (u64) *(ht_utils[1].utils[1]): 0;
 	monitor.buf->data[idx][HT_UTIL_6] = ht_utils[1].utils[2]? (u64) *(ht_utils[1].utils[2]): 0;
+#else
+	monitor.buf->data[idx][HT_UTIL_4] = ht_utils[0].utils[4]? (u64) *(ht_utils[0].utils[4]): 0;
+	monitor.buf->data[idx][HT_UTIL_5] = ht_utils[0].utils[5]? (u64) *(ht_utils[0].utils[5]): 0;
+	monitor.buf->data[idx][HT_UTIL_6] = ht_utils[1].utils[0]? (u64) *(ht_utils[1].utils[0]): 0;
+#endif
 	monitor.buf->data[idx][HT_UTIL_7] = ht_utils[2].utils[0]? (u64) *(ht_utils[2].utils[0]): 0;
+
+	/* battery part */
+/*	ht_update_battery();
+	ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_VOLTAGE_NOW, &prop);
+	monitor.buf->data[idx][HT_BAT_VOLT_NOW] = ret >= 0? prop.intval: 0;
+	ret = power_supply_get_property(monitor.psy, POWER_SUPPLY_PROP_CURRENT_NOW, &prop);
+	monitor.buf->data[idx][HT_BAT_CURR_NOW] = ret >= 0? prop.intval: 0; */
 
 	/* render & rtg util part*/
 	monitor.buf->data[idx][HT_RENDER_PID] = RenPid;
@@ -1928,7 +2133,7 @@ static int ht_registered_show(char* buf, const struct kernel_param *kp)
 	if (ht_tzd_idx == 0)
 		return 0;
 
-	for (i = 0; i < ht_tzd_idx; ++i) {
+	for (i = 0; i <= HT_THERM_2; ++i) {
 		tzd = monitor.tzd[i];
 		if (tzd)
 			offset += snprintf(buf + offset, PAGE_SIZE - offset, "%s, id: %d\n", tzd->type, tzd->id);
@@ -1956,7 +2161,9 @@ static int ht_reset_store(const char *buf, const struct kernel_param *kp)
 	if (val != 1)
 		return 0;
 
-	memset(monitor.buf, 0, sizeof(struct sample_data));
+	if (monitor.buf)
+		memset(monitor.buf, 0, sizeof(struct sample_data));
+
 	record_cnt = 0;
 	RenPid = -1;
 	ht_logi("sample data reset\n");
@@ -2124,9 +2331,9 @@ void ht_update_enqueue_ts(struct task_struct *task)
 void ht_perf_notify(void)
 {
 	u64 time;
-	/* treat any notify task as UX */
-	im_set_flag_current(IM_UX);
 
+	/* treat any notify task as UX */
+	im_set_flag_current(IM_ENQUEUE);
 	render_pid = current->pid;
 
 	if (perf_ready <= 0)
@@ -2248,9 +2455,9 @@ void ht_rtg_list_add_tail(struct task_struct *task)
 		return;
 
 	ht_logv("rtg task add list: %s(%d) util: %d, peak: %d\n",
-		task->comm, task->pid, task->ravg.demand, task->rtg_peak);
+		task->comm, task->pid, task->ravg.demand_scaled, task->rtg_peak);
 
-	if (task->ravg.demand < base_util)
+	if (task->ravg.demand_scaled < base_util)
 		return;
 
 	time = ktime_to_us(ktime_get());
@@ -2284,7 +2491,7 @@ void ht_rtg_list_add_tail(struct task_struct *task)
 	spin_lock(&ht_rtg_lock);
 	if (list_empty(&task->rtg_node))
 		list_add_tail(&task->rtg_node, &ht_rtg_head);
-	im_set_flag(task, IM_UX);
+	im_set_flag(task, IM_ENQUEUE);
 	spin_unlock(&ht_rtg_lock);
 }
 EXPORT_SYMBOL(ht_rtg_list_add_tail);
@@ -2297,9 +2504,9 @@ void ht_rtg_list_del(struct task_struct *task)
 	spin_lock(&ht_rtg_lock);
 	if (!list_empty(&task->rtg_node)) {
 		ht_logv("rtg task del list: %s(%d) util: %d, peak: %d\n",
-			task->comm, task->pid, task->ravg.demand, task->rtg_peak);
+			task->comm, task->pid, task->ravg.demand_scaled, task->rtg_peak);
 		list_del_init(&task->rtg_node);
-		im_unset_flag(task, IM_UX);
+		im_unset_flag(task, IM_ENQUEUE);
 	}
 	spin_unlock(&ht_rtg_lock);
 }
@@ -2316,8 +2523,8 @@ static int rtg_dump_show(char *buf, const struct kernel_param *kp)
 	spin_lock(&ht_rtg_lock);
 	cnt += snprintf(buf + cnt, PAGE_SIZE - cnt, "RTG list: comm, pid, util, peak, cnt, delta ts, ts\n");
 	list_for_each_entry(t, &ht_rtg_head, rtg_node) {
-		cnt += snprintf(buf + cnt, PAGE_SIZE - cnt, "%s %d %lu %u %u %lld %lld\n",
-				t->comm, t->pid, t->ravg.demand,
+		cnt += snprintf(buf + cnt, PAGE_SIZE - cnt, "%s %d %hu %u %u %lld %lld\n",
+				t->comm, t->pid, t->ravg.demand_scaled,
 				t->rtg_peak, t->rtg_cnt,
 				time - t->rtg_ts, t->rtg_ts);
 		++size;
@@ -2397,10 +2604,10 @@ static int get_util(bool isRender, int *num)
 	if (!isRender) {
 		spin_lock(&ht_rtg_lock);
 		list_for_each_entry(t, &ht_rtg_head, rtg_node) {
-			util += t->ravg.demand;
+			util += t->ravg.demand_scaled;
 			(*num)++;
 			ht_logv("RTG: comm:%s pid:%d util:%lu\n",
-					t->comm, t->pid, t->ravg.demand);
+					t->comm, t->pid, t->ravg.demand_scaled);
 		}
 		spin_unlock(&ht_rtg_lock);
 	} else {
@@ -2409,9 +2616,9 @@ static int get_util(bool isRender, int *num)
 				ht_perf_event_node) {
 			if (RenPid != t->pid)
 				continue;
-			util = t->ravg.demand;
+			util = t->ravg.demand_scaled;
 			ht_logv("Render: comm:%s pid:%d util:%lu\n",
-					t->comm, t->pid, t->ravg.demand);
+					t->comm, t->pid, t->ravg.demand_scaled);
 			break;
 		}
 		spin_unlock(&ht_perf_event_lock);
@@ -2432,7 +2639,7 @@ static int ht_init(void)
 	atomic64_set(&fps_align_ns, 0);
 
 	for (i = 0; i < HT_MONITOR_SIZE; ++i)
-		report_div[i] = (i >= HT_CPU_0 && i <= HT_THERM_1)? 100: 1;
+		report_div[i] = (i >= HT_CPU_0 && i <= HT_THERM_2)? 100: 1;
 
 	ht_set_all_mask();
 
