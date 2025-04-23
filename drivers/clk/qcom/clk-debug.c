@@ -268,35 +268,69 @@ static int clk_debug_measure_get(void *data, u64 *val)
 DEFINE_SIMPLE_ATTRIBUTE(clk_measure_fops, clk_debug_measure_get,
 							NULL, "%lld\n");
 
-void clk_get_ddr_freq(u64* val)
+#if defined(CONFIG_CONTROL_CENTER) || defined(CONFIG_HOUSTON)
+extern int get_only_mccc_hw(struct clk_hw **hwptr);
+
+void clk_get_ddr_freq(u64 *val)
 {
-	struct clk_debug_mux *meas = to_clk_measure(measure);
+	struct clk_hw *hw = NULL;
+	struct clk_hw *parent;
+	struct clk_debug_mux *mux;
+	int ret = 0;
 	u32 regval;
-	*val = 0;
-	if (likely(meas)) {
-		regmap_read(meas->regmap[7], 80, &regval);
+
+	ret = get_only_mccc_hw(&hw);
+	if (ret) {
+		pr_err("Error finding mccc clk_hw.\n");
+		return;
+	}
+
+	mutex_lock(&clk_debug_lock);
+
+	ret = clk_find_and_set_parent(measure, hw);
+	if (!ret) {
+		parent = clk_hw_get_parent(measure);
+		if (!parent) {
+			mutex_unlock(&clk_debug_lock);
+			return;
+		}
+		mux = to_clk_measure(parent);
+		regmap_read(mux->regmap, mux->period_offset, &regval);
+		if (!regval) {
+			pr_err("Error reading mccc period register, ret = %d\n",
+			       ret);
+			mutex_unlock(&clk_debug_lock);
+			return;
+		}
 		*val = 1000000000000UL;
 		do_div(*val, regval);
+	} else {
+		pr_err("Failed to set the debug mux's parent.\n");
 	}
+
+	mutex_unlock(&clk_debug_lock);
 }
+#endif
 
 static int clk_debug_read_period(void *data, u64 *val)
 {
 	struct clk_hw *hw = data;
-	struct clk_debug_mux *meas = to_clk_measure(measure);
-	int index;
-	int dbg_cc;
+	struct clk_hw *parent;
+	struct clk_debug_mux *mux;
 	int ret = 0;
 	u32 regval;
 
 	mutex_lock(&clk_debug_lock);
 
-	ret = clk_set_parent(measure->clk, hw->clk);
+	ret = clk_find_and_set_parent(measure, hw);
 	if (!ret) {
-		index = clk_debug_mux_get_parent(measure);
-		dbg_cc = meas->parent[index].dbg_cc;
-
-		regmap_read(meas->regmap[dbg_cc], meas->period_offset, &regval);
+		parent = clk_hw_get_parent(measure);
+		if (!parent) {
+			mutex_unlock(&clk_debug_lock);
+			return -EINVAL;
+		}
+		mux = to_clk_measure(parent);
+		regmap_read(mux->regmap, mux->period_offset, &regval);
 		if (!regval) {
 			pr_err("Error reading mccc period register, ret = %d\n",
 			       ret);
