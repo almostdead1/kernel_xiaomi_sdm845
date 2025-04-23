@@ -16,17 +16,6 @@
 
 #include "../clk.h"
 
-/**
- * struct mux_regmap_names - Structure of mux regmap mapping
- * @mux:		pointer to a clock debug mux
- * @regmap_name:	corresponding regmap name used to match a debug mux to
-			its regmap
- */
-struct mux_regmap_names {
-	struct clk_debug_mux *mux;
-	const char *regmap_name;
-};
-
 /* Debugfs Measure Clocks */
 
 /**
