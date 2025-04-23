@@ -132,6 +132,26 @@ static unsigned long clk_debug_mux_measure_rate(struct clk_hw *hw)
 	return ret;
 }
 
+static int clk_find_and_set_parent(struct clk_hw *mux, struct clk_hw *clk)
+{
+	int i;
+
+	if (!clk || !mux || !(mux->init->flags & CLK_IS_MEASURE))
+		return -EINVAL;
+
+	if (!clk_set_parent(mux->clk, clk->clk))
+		return 0;
+
+	for (i = 0; i < clk_hw_get_num_parents(mux); i++) {
+		struct clk_hw *parent = clk_hw_get_parent_by_index(mux, i);
+
+		if (!clk_find_and_set_parent(parent, clk))
+			return clk_set_parent(mux->clk, parent->clk);
+	}
+
+	return -EINVAL;
+}
+
 static u8 clk_debug_mux_get_parent(struct clk_hw *hw)
 {
 	struct clk_debug_mux *meas = to_clk_measure(hw);
