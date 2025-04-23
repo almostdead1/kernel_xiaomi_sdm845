@@ -296,6 +296,7 @@ void clk_get_ddr_freq(u64 *val)
 	struct clk_hw *hw = NULL;
 	struct clk_hw *parent;
 	struct clk_debug_mux *mux;
+	struct regmap *regmap;
 	int ret = 0;
 	u32 regval;
 
@@ -337,6 +338,7 @@ static int clk_debug_read_period(void *data, u64 *val)
 	struct clk_hw *hw = data;
 	struct clk_hw *parent;
 	struct clk_debug_mux *mux;
+	struct regmap *regmap;
 	int ret = 0;
 	u32 regval;
 

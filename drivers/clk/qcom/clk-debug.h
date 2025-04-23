@@ -124,7 +124,7 @@ struct clk_src {
 struct clk_debug_mux {
 	struct clk_src *parent;
 	int num_parents;
-	struct regmap *regmap;
+	struct regmap **regmap;
 	void *priv;
 	u32 debug_offset;
 	u32 post_div_offset;
