@@ -759,6 +759,7 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 			next_f = sg_policy->policy->cpuinfo.max_freq;
 		else
 			next_f = sugov_next_freq_shared(sg_cpu, time);
+
 #ifdef CONFIG_CONTROL_CENTER
 		next_f = cc_cal_next_freq_with_extra_util(policy, next_f);
 #endif
@@ -1334,7 +1335,6 @@ static int sugov_start(struct cpufreq_policy *policy)
 #ifdef CONFIG_CONTROL_CENTER
 	next_f = cc_cal_next_freq_with_extra_util(policy, next_f);
 #endif
-
 	for_each_cpu(cpu, policy->cpus) {
 		struct sugov_cpu *sg_cpu = &per_cpu(sugov_cpu, cpu);
 
@@ -1356,6 +1356,7 @@ static int sugov_start(struct cpufreq_policy *policy)
 		ht_register_cpu_util(cpu, cpumask_first(policy->related_cpus),
 				&sg_cpu->util, &sg_policy->hispeed_util);
 #endif
+
 	}
 #ifdef CONFIG_CONTROL_CENTER
 	policy->cc_enable = true;

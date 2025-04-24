@@ -37,6 +37,13 @@
 #include "walt.h"
 #include <trace/events/sched.h>
 
+#ifdef CONFIG_OPCHAIN
+#include <oneplus/uxcore/opchain_helper.h>
+#endif
+#ifdef CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
+#endif
+
 /* Curtis, 20180111, ux realm*/
 #include <../drivers/oneplus/coretech/uxcore/opchain_helper.h>
 
@@ -7208,6 +7215,11 @@ static int start_cpu(struct task_struct *p, bool boosted,
 	if ((is_dynamic_tpd_task(p) || is_tpd_task(p)) && is_tpd_enable()) {
 		start_cpu = tpd_suggested_cpu(p, start_cpu);
 }
+#endif
+#if defined(CONFIG_HOUSTON) && defined(CONFIG_OPCHAIN)
+	if (is_uxtop && current->ravg.demand_scaled >= p->ravg.demand_scaled) {
+		ht_rtg_list_add_tail(current);
+	}
 #endif
 	return walt_start_cpu(start_cpu);
 }

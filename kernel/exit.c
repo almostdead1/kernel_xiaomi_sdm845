@@ -65,17 +65,15 @@
 #include <asm/pgtable.h>
 #include <asm/mmu_context.h>
 
-#ifdef CONFIG_HOUSTON
-#include <oneplus/houston/houston_helper.h>
-#endif
-
 #ifdef CONFIG_TPD
 #include <linux/oem/tpd.h>
 #endif
 
-// tedlin@ASTI 2019/06/12 add for CONFIG_CONTROL_CENTER
 #ifdef CONFIG_CONTROL_CENTER
 #include <oneplus/control_center/control_center_helper.h>
+#endif
+#ifdef CONFIG_HOUSTON
+#include <oneplus/houston/houston_helper.h>
 #endif
 
 #include <linux/oem/im.h>
@@ -184,6 +182,10 @@ static void __exit_signal(struct task_struct *tsk)
 static void delayed_put_task_struct(struct rcu_head *rhp)
 {
 	struct task_struct *tsk = container_of(rhp, struct task_struct, rcu);
+
+#ifdef CONFIG_CONTROL_CENTER
+	cc_tsk_free((void *) tsk);
+#endif
 
 #ifdef CONFIG_TPD
 	tpd_tglist_del(tsk);
@@ -841,9 +843,8 @@ void __noreturn do_exit(long code)
 	exit_task_namespaces(tsk);
 	exit_task_work(tsk);
 	exit_thread(tsk);
-
 #ifdef CONFIG_CONTROL_CENTER
-	cc_tsk_free((void*) tsk);
+	cc_tsk_disable((void *) tsk);
 #endif
 
 #ifdef CONFIG_HOUSTON

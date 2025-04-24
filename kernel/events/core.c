@@ -4685,7 +4685,7 @@ perf_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 #ifdef CONFIG_HOUSTON
 u64 ht_perf_read(struct task_struct *task, int id)
 {
-	struct perf_event* event = task->perf_events[id], *child;
+	struct perf_event *event = task->perf_events[id], *child;
 	struct perf_event_context *ctx;
 	u64 total = 0;
 
@@ -4710,7 +4710,6 @@ out:
 	return total;
 }
 #endif
-
 static unsigned int perf_poll(struct file *file, poll_table *wait)
 {
 	struct perf_event *event = file->private_data;
@@ -10040,17 +10039,18 @@ bool ht_perf_event_open(pid_t pid, int id)
 	else
 		attr.type = PERF_TYPE_RAW;
 	switch (id) {
-		case HT_PERF_COUNT_CPU_CYCLES:
-			attr.config = PERF_COUNT_HW_CPU_CYCLES; break;
-		case HT_PERF_COUNT_INSTRUCTIONS:
-			attr.config = PERF_COUNT_HW_INSTRUCTIONS; break;
-		case HT_PERF_COUNT_CACHE_MISSES_L1:
-			attr.config = 0x3; break;
-		case HT_PERF_COUNT_CACHE_MISSES_L2:
-			attr.config = 0x17; break;
-		case HT_PERF_COUNT_CACHE_MISSES_L3:
-			attr.config = 0x2a; break;
-		default: break;
+	case HT_PERF_COUNT_CPU_CYCLES:
+		attr.config = PERF_COUNT_HW_CPU_CYCLES; break;
+	case HT_PERF_COUNT_INSTRUCTIONS:
+		attr.config = PERF_COUNT_HW_INSTRUCTIONS; break;
+	case HT_PERF_COUNT_CACHE_MISSES_L1:
+		attr.config = 0x3; break;
+	case HT_PERF_COUNT_CACHE_MISSES_L2:
+		attr.config = 0x17; break;
+	case HT_PERF_COUNT_CACHE_MISSES_L3:
+		attr.config = 0x2a; break;
+	default:
+		break;
 	}
 	attr.size = sizeof(struct perf_event_attr);
 	attr.disabled = 1;
@@ -10060,7 +10060,7 @@ bool ht_perf_event_open(pid_t pid, int id)
 		goto exit_directly;
 	if (task->perf_regular_activate)
 		goto err_task;
-	if (task->perf_events[id] &&task->perf_regular_activate)
+	if (task->perf_events[id] && task->perf_regular_activate)
 		goto err_task;
 	if (mutex_lock_interruptible(&task->signal->cred_guard_mutex))
 		goto err_task;
@@ -10100,7 +10100,6 @@ exit_directly:
 	return false;
 }
 #endif
-
 /**
  * sys_perf_event_open - open a performance event, associate it to a task/cpu
  *
@@ -10201,6 +10200,7 @@ SYSCALL_DEFINE5(perf_event_open,
 			err = PTR_ERR(task);
 			goto err_group_fd;
 		}
+
 #ifdef CONFIG_HOUSTON
 		if (task->perf_activate) {
 			err = -EBUSY;
@@ -10576,6 +10576,7 @@ err_group_fd:
 	fdput(group);
 err_fd:
 	put_unused_fd(event_fd);
+
 #ifdef CONFIG_HOUSTON
 	mutex_unlock(&ht_perf_event_mutex_lock);
 #endif

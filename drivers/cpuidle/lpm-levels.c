@@ -561,7 +561,6 @@ static inline bool is_cpu_biased(int cpu)
 	return (now - last) < BIAS_HYST;
 }
 
-#ifdef CONFIG_CONTROL_CENTER
 static inline bool lpm_disallowed(s64 sleep_us, int cpu, struct lpm_cpu *pm_cpu)
 {
 	uint64_t bias_time = 0;
@@ -617,13 +616,8 @@ static int cpu_power_select(struct cpuidle_device *dev,
 	uint32_t *min_residency = get_per_cpu_min_residency(dev->cpu);
 	uint32_t *max_residency = get_per_cpu_max_residency(dev->cpu);
 
-#ifdef CONFIG_CONTROL_CENTER
 	if (lpm_disallowed(sleep_us, dev->cpu, cpu))
 		goto done_select;
-#else
-	if ((sleep_disabled && !cpu_isolated(dev->cpu)) || sleep_us < 0)
-		return best_level;
-#endif
 
 	idx_restrict = cpu->nlevels + 1;
 

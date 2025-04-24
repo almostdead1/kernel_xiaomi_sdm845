@@ -103,7 +103,6 @@
 #ifdef CONFIG_HOUSTON
 #include <oneplus/houston/houston_helper.h>
 #endif
-
 #ifdef CONFIG_IM
 #include <linux/oem/im.h>
 #endif
@@ -3754,6 +3753,7 @@ static void __sched notrace __schedule(bool preempt)
 #ifdef CONFIG_HOUSTON
 		ht_sched_switch_update(prev, next);
 #endif
+
 		rq = context_switch(rq, prev, next, &rf); /* unlocks the rq */
 	} else {
 		update_task_ravg(prev, rq, TASK_UPDATE, wallclock, 0);
@@ -4110,12 +4110,11 @@ void restore_user_nice_safe(struct task_struct *p)
 		return;
 
 	p->static_prio = NICE_TO_PRIO(nice);
-	set_load_weight(p);
+	set_load_weight(p, true);
 	p->prio = effective_prio(p);
 
 	p->nice_effect_ts = ULLONG_MAX;
 }
-
 void set_user_nice_no_cache(struct task_struct *p, long nice)
 {
 	bool queued, running;
@@ -4125,7 +4124,6 @@ void set_user_nice_no_cache(struct task_struct *p, long nice)
 
 	if (task_nice(p) == nice || nice < MIN_NICE || nice > MAX_NICE)
 		return;
-
 	/*
 	 * We have to be careful, if called from sys_setpriority(),
 	 * the task might be in the middle of scheduling on another CPU.
@@ -4151,7 +4149,7 @@ void set_user_nice_no_cache(struct task_struct *p, long nice)
 		put_prev_task(rq, p);
 
 	p->static_prio = NICE_TO_PRIO(nice);
-	set_load_weight(p);
+	set_load_weight(p, true);
 	old_prio = p->prio;
 	p->prio = effective_prio(p);
 	delta = p->prio - old_prio;

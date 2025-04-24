@@ -290,6 +290,7 @@ int update_devfreq(struct devfreq *devfreq)
 		freq = devfreq->max_freq;
 		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
 	}
+
 #ifdef CONFIG_CONTROL_CENTER
 	if (cc_ddr_boost_enabled()) {
 		if (devfreq->dev.cc_marked) {
@@ -612,6 +613,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
 	devfreq_set_freq_limits(devfreq);
 
 	dev_set_name(&devfreq->dev, "%s", dev_name(dev));
+
 #ifdef CONFIG_CONTROL_CENTER
 	if (dev_name(dev))
 		devfreq->dev.cc_marked = cc_is_ddrfreq_related(dev_name(dev));

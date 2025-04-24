@@ -629,6 +629,7 @@ EXPORT_SYMBOL_GPL(cpufreq_disable_fast_switch);
 unsigned int cpufreq_driver_resolve_freq(struct cpufreq_policy *policy,
 					 unsigned int target_freq)
 {
+
 #ifdef CONFIG_CONTROL_CENTER
 	if (likely(policy->cc_enable))
 		target_freq = clamp_val(target_freq, policy->cc_min, policy->cc_max);
@@ -1995,11 +1996,6 @@ unsigned int cpufreq_driver_fast_switch(struct cpufreq_policy *policy,
 					unsigned int target_freq)
 {
 	int ret;
-
-#ifdef CONFIG_CONTROL_CENTER
-	if (likely(policy->cc_enable))
-		target_freq = clamp_val(target_freq, policy->cc_min, policy->cc_max);
-#endif
 	target_freq = cb_cap(policy, target_freq);
 	target_freq = clamp_val(target_freq, policy->min, policy->max);
 
@@ -2389,15 +2385,12 @@ static int cpufreq_set_policy(struct cpufreq_policy *policy,
 
 	policy->min = new_policy->min;
 	policy->max = new_policy->max;
-
-// tedlin@ASTI 2019/06/12 add for CONFIG_CONTROL_CENTER
 #ifdef CONFIG_CONTROL_CENTER
 	spin_lock(&policy->cc_lock);
 	policy->cc_min = policy->min;
 	policy->cc_max = policy->max;
 	spin_unlock(&policy->cc_lock);
 #endif
-
 	trace_cpu_frequency_limits(policy->max, policy->min, policy->cpu);
 
 	policy->cached_target_freq = UINT_MAX;

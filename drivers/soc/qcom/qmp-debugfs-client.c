@@ -36,13 +36,13 @@ static struct mbox_client *cl;
 static DEFINE_MUTEX(qmp_debugfs_mutex);
 
 #ifdef CONFIG_CONTROL_CENTER
-#define DDR_CONFIG_SIZE 12
+#define DDR_CONFIG_SIZE 13
 #define DDR_BUFFER_SIZE 64
 struct ddr_config {
 	char buf[DDR_BUFFER_SIZE];
 	size_t len;
 } ddr_config[DDR_CONFIG_SIZE] = {
-	{ "{class:ddr, res:fixed, val: 100}", 32 },
+	{ "{class:ddr, res:fixed, val: 0}", 30 },
 	{ "{class:ddr, res:fixed, val: 200}", 32 },
 	{ "{class:ddr, res:fixed, val: 300}", 32 },
 	{ "{class:ddr, res:fixed, val: 451}", 32 },
@@ -53,8 +53,10 @@ struct ddr_config {
 	{ "{class:ddr, res:fixed, val: 1353}", 33 },
 	{ "{class:ddr, res:fixed, val: 1555}", 33 },
 	{ "{class:ddr, res:fixed, val: 1804}", 33 },
-	{ "{class:ddr, res:fixed, val: 2092}", 33 }
+	{ "{class:ddr, res:fixed, val: 2092}", 33 },
+	{ "{class:ddr, res:fixed, val: 2736}", 33 }
 };
+
 void aop_lock_ddr_freq(int config)
 {
 	int target = 0;
@@ -64,18 +66,45 @@ void aop_lock_ddr_freq(int config)
 
 	switch (config) {
 	case 0:
-	case 100:  target = 0; break;
-	case 200:  target = 1; break;
-	case 300:  target = 2; break;
-	case 451:  target = 3; break;
-	case 547:  target = 4; break;
-	case 681:  target = 5; break;
-	case 768:  target = 6; break;
-	case 1017: target = 7; break;
-	case 1353: target = 8; break;
-	case 1555: target = 9; break;
-	case 1804: target = 10; break;
-	case 2092: target = 11; break;
+	case 100:
+		target = 0;
+		break;
+	case 200:
+		target = 1;
+		break;
+	case 300:
+		target = 2;
+		break;
+	case 451:
+		target = 3;
+		break;
+	case 547:
+		target = 4;
+		break;
+	case 681:
+		target = 5;
+		break;
+	case 768:
+		target = 6;
+		break;
+	case 1017:
+		target = 7;
+		break;
+	case 1353:
+		target = 8;
+		break;
+	case 1555:
+		target = 9;
+		break;
+	case 1804:
+		target = 10;
+		break;
+	case 2092:
+		target = 11;
+		break;
+	case 2736:
+		target = 12;
+		break;
 	default:
 		pr_warn("config not match: %d\n", config);
 		mutex_unlock(&qmp_debugfs_mutex);
