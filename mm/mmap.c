@@ -53,6 +53,8 @@
 
 #include "internal.h"
 
+#define GPU_HIGH_LIMIT_3776M  3959422976
+
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
 #endif
