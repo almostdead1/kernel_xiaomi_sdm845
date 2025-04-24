@@ -2749,19 +2749,25 @@ static inline long calc_cfs_shares(struct cfs_rq *cfs_rq, struct task_group *tg)
 # endif /* CONFIG_SMP */
 
 static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
-			    unsigned long weight)
+			    unsigned long weight, unsigned long runnable)
 {
 	if (se->on_rq) {
 		/* commit outstanding execution time */
 		if (cfs_rq->curr == se)
 			update_curr(cfs_rq);
 		account_entity_dequeue(cfs_rq, se);
+		dequeue_runnable_load_avg(cfs_rq, se);
 	}
+	dequeue_load_avg(cfs_rq, se);
 
+	se->runnable_weight = runnable;
 	update_load_set(&se->load, weight);
 
-	if (se->on_rq)
+	enqueue_load_avg(cfs_rq, se);
+	if (se->on_rq) {
 		account_entity_enqueue(cfs_rq, se);
+		enqueue_runnable_load_avg(cfs_rq, se);
+	}
 }
 
 void reweight_task(struct task_struct *p, int prio)
