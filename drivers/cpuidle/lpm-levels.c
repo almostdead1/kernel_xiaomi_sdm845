@@ -597,7 +597,6 @@ out:
 
 	return false;
 }
-#endif
 
 static int cpu_power_select(struct cpuidle_device *dev,
 		struct lpm_cpu *cpu)
