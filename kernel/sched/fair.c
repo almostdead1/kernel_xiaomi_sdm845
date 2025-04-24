@@ -2756,17 +2756,13 @@ static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
 		if (cfs_rq->curr == se)
 			update_curr(cfs_rq);
 		account_entity_dequeue(cfs_rq, se);
-		dequeue_runnable_load_avg(cfs_rq, se);
 	}
-	dequeue_load_avg(cfs_rq, se);
 
 	se->runnable_weight = runnable;
 	update_load_set(&se->load, weight);
 
-	enqueue_load_avg(cfs_rq, se);
 	if (se->on_rq) {
 		account_entity_enqueue(cfs_rq, se);
-		enqueue_runnable_load_avg(cfs_rq, se);
 	}
 }
 
@@ -2803,7 +2799,7 @@ static void update_cfs_shares(struct sched_entity *se)
 #endif
 	shares = calc_cfs_shares(cfs_rq, tg);
 
-	reweight_entity(cfs_rq_of(se), se, shares);
+	reweight_entity(cfs_rq_of(se), se, shares, runnable);
 }
 
 #else /* CONFIG_FAIR_GROUP_SCHED */
