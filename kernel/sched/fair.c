@@ -2783,7 +2783,7 @@ static void update_cfs_shares(struct sched_entity *se)
 {
 	struct cfs_rq *cfs_rq = group_cfs_rq(se);
 	struct task_group *tg;
-	long shares;
+	long shares, runnable;
 
 	if (!cfs_rq)
 		return;
