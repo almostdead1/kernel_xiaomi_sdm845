@@ -10,5 +10,6 @@ obj-$(CONFIG_IM) += im/
 obj-$(CONFIG_AIGOV) += aigov/
 obj-$(CONFIG_OPCHAIN) += uxcore/ uxcore/core/
 obj-$(CONFIG_SMART_BOOST) += smartboost/ smartboost/core/
+obj-$(CONFIG_VM_FRAGMENT_MONITOR) += vm_fragment_monitor/
 obj-$(CONFIG_TPD) += tpd/
 obj-$(CONFIG_CPUFREQ_BOUNCING) += cpufreq_bouncing/

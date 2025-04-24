@@ -58,6 +58,11 @@ config SMART_BOOST
         default n
         help
          Smart Boost feature
+
+config VM_FRAGMENT_MONITOR
+	default n
+	bool "monitor virtual memory fragment"
+
 config TPD
 	default n
 	bool "a task placement decision for cpu limitation"
