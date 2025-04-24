@@ -12,4 +12,5 @@ obj-$(CONFIG_OPCHAIN) += uxcore/ uxcore/core/
 obj-$(CONFIG_SMART_BOOST) += smartboost/ smartboost/core/
 obj-$(CONFIG_VM_FRAGMENT_MONITOR) += vm_fragment_monitor/
 obj-$(CONFIG_TPD) += tpd/
+obj-$(CONFIG_RATP) += ratp/
 obj-$(CONFIG_CPUFREQ_BOUNCING) += cpufreq_bouncing/

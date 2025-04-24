@@ -16,6 +16,9 @@ static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 
 /* Initial task structure */
 struct task_struct init_task = INIT_TASK(init_task);
+#ifdef CONFIG_RATP
+	.cpus_suggested = CPU_MASK_ALL,
+#endif
 EXPORT_SYMBOL(init_task);
 
 /*

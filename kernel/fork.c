@@ -579,6 +579,9 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	tsk->cached_prio = tsk->static_prio;
 #endif
 
+#ifdef CONFIG_RATP
+	tsk->cpus_suggested = CPU_MASK_ALL;
+#endif
 #ifdef CONFIG_TPD
 	tsk->tpd = 0;
 	tsk->dtpd = 0;
