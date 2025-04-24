@@ -8740,7 +8740,7 @@ void __init sched_init(void)
 	i = alloc_related_thread_groups();
 	BUG_ON(i);
 
-	set_load_weight(&init_task);
+	set_load_weight(&init_task, false);
 
 	/*
 	 * The boot idle thread does lazy MMU switching as well:
