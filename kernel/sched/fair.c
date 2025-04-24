@@ -44,6 +44,13 @@
 #include <oneplus/houston/houston_helper.h>
 #endif
 
+#ifdef CONFIG_IM
+#include <linux/oem/im.h>
+#endif
+#ifdef CONFIG_CONTROL_CENTER
+#include <linux/oem/control_center.h>
+#endif
+
 /* Curtis, 20180111, ux realm*/
 #include <../drivers/oneplus/coretech/uxcore/opchain_helper.h>
 
@@ -7216,11 +7223,33 @@ static int start_cpu(struct task_struct *p, bool boosted,
 		start_cpu = tpd_suggested_cpu(p, start_cpu);
 }
 #endif
+#ifdef CONFIG_OPCHAIN
+	bool is_uxtop = is_opc_task(p, UT_FORE);
+#endif
 #if defined(CONFIG_HOUSTON) && defined(CONFIG_OPCHAIN)
 	if (is_uxtop && current->ravg.demand >= p->ravg.demand) {
 		ht_rtg_list_add_tail(current);
 	}
 #endif
+
+#if defined(CONFIG_CONTROL_CENTER) && defined(CONFIG_IM)
+	if ((im_rendering(p)) &&
+			im_render_grouping_enable() &&
+			ccdm_get_hint(CCDM_TB_PLACE_BOOST) &&
+			task_util(p) > ccdm_get_min_util_threshold()) {
+		start_cpu = rd->mid_cap_orig_cpu == -1 ?
+			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
+		return start_cpu;
+	}
+#endif
+#ifdef CONFIG_IM
+	if (im_hwuiEx(p)) {
+		start_cpu = rd->mid_cap_orig_cpu == -1 ?
+			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
+		return start_cpu;
+	}
+#endif
+
 	return walt_start_cpu(start_cpu);
 }
 
