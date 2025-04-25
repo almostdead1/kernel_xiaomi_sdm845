@@ -1738,6 +1738,9 @@ struct task_struct {
 	refcount_t usage;
 	unsigned int flags;	/* per process flags, defined below */
 	unsigned int ptrace;
+#ifdef CONFIG_SF_BOOST
+	int compensate_need;
+#endif
 
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;

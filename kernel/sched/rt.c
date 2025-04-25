@@ -1798,6 +1798,11 @@ static int find_lowest_rq(struct task_struct *task)
 				  sched_boost_policy() : SCHED_BOOST_NONE;
 		best_capacity = placement_boost ? 0 : ULONG_MAX;
 
+#ifdef CONFIG_SF_BOOST
+	if (task->compensate_need == 2 && tutil > 90)
+		boost_on_big = true;
+#endif
+
 		rcu_read_lock();
 		sd = rcu_dereference(per_cpu(sd_ea, start_cpu));
 		if (!sd) {
