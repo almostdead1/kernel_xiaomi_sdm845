@@ -7807,6 +7807,7 @@ enum fastpaths {
 static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu, int sync)
 {
 	bool boosted, prefer_idle;
+	int best_energy_cpu = prev_cpu;
 	struct sched_domain *sd;
 	int target_cpu;
 	int backup_cpu = -1;
@@ -7982,7 +7983,7 @@ out:
 	trace_sched_task_util(p, next_cpu, backup_cpu, target_cpu, sync,
 			      fbt_env.need_idle, fastpath,
 			      fbt_env.placement_boost, rtg_target ?
-			      cpumask_first(rtg_target) : -1, start_t, boosted, is_uxtop);
+			      cpumask_first(rtg_target) : -1, start_t, boosted, is_uxtop, best_energy_cpu);
 	return target_cpu;
 }
 
