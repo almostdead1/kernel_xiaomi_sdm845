@@ -2867,7 +2867,6 @@ void add_new_task_to_grp(struct task_struct *new)
 
 #ifdef CONFIG_IM
 	if (im_sf(new)) {
-		// add child of sf into rdg
 		if (!im_render_grouping_enable())
 			im_list_add_task(new);
 	}
@@ -2943,9 +2942,6 @@ int sched_set_group_id(struct task_struct *p, unsigned int group_id)
 {
 	/* DEFAULT_CGROUP_COLOC_ID is a reserved id */
 	if (group_id == DEFAULT_CGROUP_COLOC_ID)
-#ifdef CONFIG_IM
-		if (!im_rendering(p))
-#endif
 		return -EINVAL;
 
 	return __sched_set_group_id(p, group_id);
@@ -2995,12 +2991,6 @@ late_initcall(create_default_coloc_group);
 int sync_cgroup_colocation(struct task_struct *p, bool insert)
 {
 	unsigned int grp_id = insert ? DEFAULT_CGROUP_COLOC_ID : 0;
-#ifdef CONFIG_IM
-		if (im_sf(p)) {
-			// bypass surfaceflinger to be group 0
-			return 0;
-		}
-#endif
 
 	return __sched_set_group_id(p, grp_id);
 }
@@ -3472,13 +3462,13 @@ int group_show(struct seq_file *m, void *v)
 
 	list_for_each_entry(p, &grp->tasks, grp_list) {
 
-		total_demand += p->ravg.demand;
+		total_demand += p->ravg.demand_scaled;
 
 		if (!im_rendering(p))
 			continue;
 
-		seq_printf(m, "%u, %lu, %d\n", p->pid, p->ravg.demand, p->cpu);
-		render_demand += p->ravg.demand;
+		seq_printf(m, "%u, %lu, %d\n", p->pid, p->ravg.demand_scaled, p->cpu);
+		render_demand += p->ravg.demand_scaled;
 	}
 
 	seq_printf(m, "total: %u / render: %u\n", total_demand, render_demand);
@@ -3505,6 +3495,5 @@ void group_remove(void)
 			sched_set_group_id(p, 0);
 	}
 }
-
 #endif
 
