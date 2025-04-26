@@ -773,10 +773,11 @@ TRACE_EVENT(sched_energy_diff,
 
 	TP_PROTO(struct task_struct *p, int prev_cpu, unsigned int prev_energy,
 		 int next_cpu, unsigned int next_energy,
-		 int backup_cpu, unsigned int backup_energy),
+		 int backup_cpu, unsigned int backup_energy,
+		unsigned long best_energy_cpu),
 
 	TP_ARGS(p, prev_cpu, prev_energy, next_cpu, next_energy,
-		backup_cpu, backup_energy),
+		backup_cpu, backup_energy, best_energy_cpu),
 
 	TP_STRUCT__entry(
 		__field(int, pid		)
@@ -786,6 +787,7 @@ TRACE_EVENT(sched_energy_diff,
 		__field(int, next_energy	)
 		__field(int, backup_cpu		)
 		__field(int, backup_energy	)
+		__field(int,		best_energy_cpu)
 	),
 
 	TP_fast_assign(
@@ -796,22 +798,24 @@ TRACE_EVENT(sched_energy_diff,
 		__entry->next_energy		= next_energy;
 		__entry->backup_cpu		= backup_cpu;
 		__entry->backup_energy		= backup_energy;
+		__entry->best_energy_cpu	= best_energy_cpu;
 	),
 
-	TP_printk("pid=%d prev_cpu=%d prev_energy=%u next_cpu=%d next_energy=%u backup_cpu=%d backup_energy=%u",
+	TP_printk("pid=%d prev_cpu=%d prev_energy=%u next_cpu=%d next_energy=%u backup_cpu=%d backup_energy=%u best_energy_cpu=%d",
 		__entry->pid, __entry->prev_cpu, __entry->prev_energy,
 		__entry->next_cpu, __entry->next_energy,
-		__entry->backup_cpu, __entry->backup_energy)
+		__entry->backup_cpu, __entry->backup_energy,
+		__entry->best_energy_cpu)
 );
 
 TRACE_EVENT(sched_task_util,
 
 	TP_PROTO(struct task_struct *p, int next_cpu, int backup_cpu,
 		 int target_cpu, bool sync, bool need_idle, int fastpath,
-		 bool placement_boost, int rtg_cpu, bool ux_task, u64 start_t, bool is_uxtop),
+		 bool placement_boost, int rtg_cpu, bool ux_task, u64 start_t, bool is_uxtop, int best_energy_cpu),
 
 	TP_ARGS(p, next_cpu, backup_cpu, target_cpu, sync, need_idle, fastpath,
-		placement_boost, rtg_cpu, ux_task, start_t, is_uxtop),
+		placement_boost, rtg_cpu, ux_task, start_t, is_uxtop, best_energy_cpu),
 
 	TP_STRUCT__entry(
 		__field(int, pid			)
@@ -829,6 +833,7 @@ TRACE_EVENT(sched_task_util,
 		__field(u64, latency			)
 		__field(bool, ux_task 			)
 		__field(bool,		is_uxtop)
+		__field(int,		best_energy_cpu)
 	),
 
 	TP_fast_assign(
@@ -847,10 +852,11 @@ TRACE_EVENT(sched_task_util,
 		__entry->latency		= (sched_clock() - start_t);
 		__entry->ux_task		= ux_task;
 		__entry->is_uxtop		= is_uxtop;
+		__entry->best_energy_cpu        = best_energy_cpu;
 	),
 
-	TP_printk("pid=%d comm=%s util=%lu prev_cpu=%d next_cpu=%d backup_cpu=%d target_cpu=%d sync=%d need_idle=%d fastpath=%d placement_boost=%d rtg_cpu=%d latency=%llu uxtop=%d is_uxtop=%d",
-		__entry->pid, __entry->comm, __entry->util, __entry->prev_cpu, __entry->next_cpu, __entry->backup_cpu, __entry->target_cpu, __entry->sync, __entry->need_idle,  __entry->fastpath, __entry->placement_boost, __entry->rtg_cpu, __entry->latency, __entry->ux_task, __entry->is_uxtop)
+	TP_printk("pid=%d comm=%s util=%lu prev_cpu=%d next_cpu=%d backup_cpu=%d target_cpu=%d sync=%d need_idle=%d fastpath=%d placement_boost=%d rtg_cpu=%d latency=%llu uxtop=%d is_uxtop=%d best_energy_cpu=%d",
+		__entry->pid, __entry->comm, __entry->util, __entry->prev_cpu, __entry->next_cpu, __entry->backup_cpu, __entry->target_cpu, __entry->sync, __entry->need_idle,  __entry->fastpath, __entry->placement_boost, __entry->rtg_cpu, __entry->latency, __entry->ux_task, __entry->is_uxtop, __entry->best_energy_cpu)
 );
 
 #endif
