@@ -50,6 +50,9 @@
 #ifdef CONFIG_CONTROL_CENTER
 #include <linux/oem/control_center.h>
 #endif
+#ifdef CONFIG_TPP
+#include <linux/oem/tpp.h>
+#endif
 
 /* Curtis, 20180111, ux realm*/
 #include <../drivers/oneplus/coretech/uxcore/opchain_helper.h>
@@ -5241,6 +5244,9 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 #endif /* CONFIG_SMP */
 	hrtick_update(rq);
+#ifdef CONFIG_TPP
+	tpp_enqueue(cpu_of(rq), p);
+#endif
 }
 
 static void set_next_buddy(struct sched_entity *se);
@@ -5320,6 +5326,9 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 
 	util_est_dequeue(&rq->cfs, p, task_sleep);
 	hrtick_update(rq);
+#ifdef CONFIG_TPP
+	tpp_dequeue(cpu_of(rq), p);
+#endif
 }
 
 #ifdef CONFIG_SMP
@@ -7942,6 +7951,12 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu, int sync
 			goto out;
 		}
 #endif
+#ifdef CONFIG_RATP
+	if (is_ratp_enable()) {
+		best_energy_cpu = cpu;
+		goto unlock;
+	}
+#endif
 
 		/* Check if EAS_CPU_NXT is a more energy efficient CPU */
 		if (select_energy_cpu_idx(&eenv) != EAS_CPU_PRV) {
@@ -7960,6 +7975,9 @@ static int select_energy_cpu_brute(struct task_struct *p, int prev_cpu, int sync
 	schedstat_inc(p->se.statistics.nr_wakeups_secb_count);
 	schedstat_inc(this_rq()->eas_stats.secb_count);
 
+#ifdef CONFIG_TPP
+	best_energy_cpu = tpp_find_cpu(p, best_energy_cpu);
+#endif
 out:
 	trace_sched_task_util(p, next_cpu, backup_cpu, target_cpu, sync,
 			      fbt_env.need_idle, fastpath,
