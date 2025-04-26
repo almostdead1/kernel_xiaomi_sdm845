@@ -513,7 +513,7 @@ static inline int worker_thread_middle_core(struct task_struct *p, int cpu_orig)
 		return -1;
 	}
 	sg = start_sd->groups;
-	for_each_cpu(cpu, sched_group_span(sg)) {
+	for_each_cpu(cpu, sched_group_cpus(sg)) {
 		if (cpu_available(cpu)) {
 			int cnt_on_rq = get_tpp_thread_cnt(TPP_UNITY_WORKER_THREAD_ID, cpu);
 

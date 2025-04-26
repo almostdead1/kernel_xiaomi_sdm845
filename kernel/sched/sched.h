@@ -37,8 +37,8 @@ extern unsigned int sched_smp_overlap_capacity;
 extern int group_show(struct seq_file *m, void *v);
 extern void group_remove(void);
 #else
-static inline int group_show(struct seq_file *m, void *v) {return 0};
-static inline void group_remove(void) {};
+static inline int group_show(struct seq_file *m, void *v) {return 0; }
+static inline void group_remove(void) {}
 #endif
 
 #ifdef CONFIG_SCHED_WALT

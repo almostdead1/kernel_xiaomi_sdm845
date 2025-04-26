@@ -2615,8 +2615,67 @@ static int proc_im_flag(struct seq_file *m, struct pid_namespace *ns,
 	seq_printf(m, "%d %s\n", task->im_flag, desc);
 	return 0;
 }
-#endif /* CONFIG_IM */
 
+static ssize_t
+tbctl_write(struct file *file, const char __user *buf,
+	size_t count, loff_t *offset)
+{
+	char buffer[64];
+	int err = 0;
+	unsigned int tb_pol = 0;
+	unsigned int tb_type = 0;
+	unsigned int args[6] = {0};
+	int c;
+
+	memset(buffer, 0, sizeof(buffer));
+	if (count > sizeof(buffer) - 1)
+		count = sizeof(buffer) - 1;
+	if (copy_from_user(buffer, buf, count)) {
+		err = -EFAULT;
+		goto out;
+	}
+
+
+	c = sscanf(buffer, "%u,%u,%u,%u,%u,%u,%u,%u\n",
+		&tb_pol, &tb_type,
+		&args[0], &args[1], &args[2], &args[3], &args[4], &args[5]);
+
+	if (c != 6 && c != 8) {
+		pr_err("tb params invalid. %s. IGNORED.\n", buffer);
+		err = -EFAULT;
+		goto out;
+	}
+
+	if (tb_pol == TB_POL_HWUI_BOOST)
+		tb_parse_req_v2(tb_pol, tb_type, args, 6);
+	else {
+		unsigned int v[4] = {0};
+
+		memcpy(v, args, sizeof(unsigned int) * 4);
+		tb_parse_req(tb_pol, tb_type, v);
+	}
+
+out:
+	return (err < 0) ? err : count;
+}
+
+static int tbctl_show(struct seq_file *m, void *v)
+{
+	return 0;
+}
+
+static int tbctl_open(struct inode *inode, struct file *filp)
+{
+	return single_open(filp, tbctl_show, inode);
+}
+static const struct file_operations proc_tbctl_operation = {
+	.open           = tbctl_open,
+	.read           = seq_read,
+	.write          = tbctl_write,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+#endif /* CONFIG_IM */
 #ifdef CONFIG_TPD
 static ssize_t
 tpd_write(struct file *file, const char __user *buf,
@@ -3439,6 +3498,7 @@ static const struct pid_entry tgid_base_stuff[] = {
 #endif
 #ifdef CONFIG_IM
 	ONE("im_flag", 0444, proc_im_flag),
+	REG("tb_ctl", 0666, proc_tbctl_operation),
 #endif
 #ifdef CONFIG_MEMPLUS
 	REG("memplus_type", 0666,
@@ -3856,6 +3916,7 @@ static const struct pid_entry tid_base_stuff[] = {
 #endif
 #ifdef CONFIG_IM
 	ONE("im_flag", 0444, proc_im_flag),
+	REG("tb_ctl", 0666, proc_tbctl_operation),
 #endif
 #ifdef CONFIG_TPD
 	REG("tpd", 0666, proc_tpd_operation),
