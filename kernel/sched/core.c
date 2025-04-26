@@ -6930,6 +6930,7 @@ DEFINE_PER_CPU(struct sched_domain *, sd_numa);
 DEFINE_PER_CPU(struct sched_domain *, sd_asym);
 DEFINE_PER_CPU(struct sched_domain *, sd_ea);
 DEFINE_PER_CPU(struct sched_domain *, sd_scs);
+DEFINE_PER_CPU(struct sched_domain *, sd_asym_cpucapacity);
 
 static void update_top_cache_domain(int cpu)
 {
