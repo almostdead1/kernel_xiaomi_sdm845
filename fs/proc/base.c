@@ -102,6 +102,8 @@
 #include "fd.h"
 
 #include "../../lib/kstrtox.h"
+#include <oneplus/houston/houston_helper.h>
+#include <linux/oem/control_center.h>
 
 struct task_kill_info {
 	struct task_struct *task;
