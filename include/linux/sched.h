@@ -2288,6 +2288,9 @@ struct task_struct {
 #ifdef CONFIG_IM
 	int im_flag;
 #endif
+#ifdef CONFIG_TPP
+	int tpp_flag;
+#endif
 
 #ifdef CONFIG_TPD
 	int tpd;

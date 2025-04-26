@@ -69,6 +69,11 @@ config TPD
 	help
 	 Task affinity by decison
 
+config TPP
+	default n
+	depends on IM
+	bool "Task parallel placement"
+
 config RATP
        bool "restricted admission for task placement in low-end platfom"
        default n

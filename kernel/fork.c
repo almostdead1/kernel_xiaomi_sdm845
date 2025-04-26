@@ -2060,6 +2060,9 @@ static __latent_entropy struct task_struct *copy_process(
 #ifdef CONFIG_CONTROL_CENTER
 		cc_tsk_init((void *) p);
 #endif
+#ifdef CONFIG_TPP
+		p->tpp_flag = 0;
+#endif
 #ifdef CONFIG_IM
 		im_tsk_init_flag((void *) p);
 #endif
