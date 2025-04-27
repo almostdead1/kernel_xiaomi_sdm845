@@ -3711,6 +3711,25 @@ util_est_dequeue(struct cfs_rq *cfs_rq, struct task_struct *p, bool task_sleep)
 	WRITE_ONCE(p->se.avg.util_est, ue);
 }
 
+static inline bool
+bias_to_this_cpu(struct task_struct *p, int cpu, int start_cpu)
+{
+	bool base_test = cpumask_test_cpu(cpu, &p->cpus_allowed) &&
+			cpu_active(cpu);
+	bool start_cap_test = (capacity_orig_of(cpu) >=
+					capacity_orig_of(start_cpu));
+
+#ifdef CONFIG_RATP
+	if (is_ratp_enable() &&
+			(!(im_rendering(p) && prefer_sched_group(p)) ||
+			(!(is_gmod_enable() && prefer_top(p)))))
+		base_test = cpumask_test_cpu(cpu, &p->cpus_suggested) &&
+				cpu_active(cpu);
+#endif
+
+	return base_test && start_cap_test;
+}
+
 #else /* CONFIG_SMP */
 
 static inline int
@@ -7815,15 +7834,6 @@ bias_to_waker_cpu(struct task_struct *p, int cpu, struct cpumask *rtg_target)
 	       cpu_active(cpu) && !cpu_isolated(cpu) &&
 	       capacity_orig_of(cpu) >= capacity_orig_of(rtg_target_cpu) &&
 	       task_fits_max(p, cpu);
-
-#ifdef CONFIG_RATP
-	if (is_ratp_enable() &&
-			(!(im_rendering(p) && prefer_sched_group(p)) ||
-			(!(is_gmod_enable() && prefer_top(p)))))
-		base_test = cpumask_test_cpu(cpu, &p->cpus_suggested) &&
-				cpu_active(cpu);
-#endif
-
 }
 
 #define SCHED_SELECT_PREV_CPU_NSEC	2000000
