@@ -6342,7 +6342,8 @@ static inline int select_energy_cpu_idx(struct energy_env *eenv)
 				eenv->cpu[EAS_CPU_NXT].cpu_id,
 				eenv->cpu[EAS_CPU_NXT].energy,
 				eenv->cpu[EAS_CPU_BKP].cpu_id,
-				eenv->cpu[EAS_CPU_BKP].energy);
+				eenv->cpu[EAS_CPU_BKP].energy,
+				(unsigned long)best_energy_cpu);
 	/*
 	 * Compare the other CPU candidates to find a CPU which can be
 	 * more energy efficient then EAS_CPU_PRV
