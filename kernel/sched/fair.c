@@ -6292,7 +6292,8 @@ int calc_total_energy(struct energy_env *eenv, struct sched_domain *sd,
  */
 static inline int select_energy_cpu_idx(struct energy_env *eenv)
 {
-	int best_energy_cpu = prev_cpu;
+	int best_energy_cpu = eenv->cpu[EAS_CPU_PRV].cpu_id;
+	unsigned long best_energy = eenv->cpu[EAS_CPU_PRV].energy;
 	struct sched_domain *sd;
 	struct perf_domain *pd;
 	int sd_cpu = -1;
@@ -6344,6 +6345,7 @@ static inline int select_energy_cpu_idx(struct energy_env *eenv)
 				eenv->cpu[EAS_CPU_NXT].energy,
 				eenv->cpu[EAS_CPU_BKP].cpu_id,
 				eenv->cpu[EAS_CPU_BKP].energy,
+				(unsigned long)best_energy,
 				(unsigned long)best_energy_cpu);
 	/*
 	 * Compare the other CPU candidates to find a CPU which can be
