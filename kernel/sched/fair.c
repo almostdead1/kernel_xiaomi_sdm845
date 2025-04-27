@@ -95,6 +95,17 @@ walt_dec_cfs_rq_stats(struct cfs_rq *cfs_rq, struct task_struct *p) {}
 
 #endif
 
+#ifdef CONFIG_RATP
+static void mask_big_cores(int start_bit, struct task_struct *p)
+{
+	int i;
+
+	for (i = start_bit; i < nr_cpu_ids; ++i)
+		cpumask_clear_cpu(i, &p->cpus_suggested);
+}
+#else
+static inline void mask_big_cores(int start_bit) {}
+#endif
 
 /*
  * Targeted preemption latency for CPU-bound tasks:
@@ -3785,6 +3796,16 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int initial)
 			thresh >>= 1;
 
 		vruntime -= thresh;
+#ifdef CONFIG_RATP
+		if (is_ratp_enable() && entity_is_task(se) &&
+				((im_rendering(task_of(se)) && prefer_sched_group(task_of(se))) ||
+				(is_gmod_enable() && prefer_top(task_of(se))))) {
+			vruntime -= sysctl_sched_latency;
+			vruntime -= thresh;
+			se->vruntime = vruntime;
+			return;
+		}
+#endif
 	}
 
 	/* ensure we never gain time by being placed backwards. */
@@ -7240,6 +7261,40 @@ static int start_cpu(struct task_struct *p, bool boosted,
 		start_cpu = rd->min_cap_orig_cpu;
 	else
 		start_cpu = rd->max_cap_orig_cpu;
+#ifdef CONFIG_RATP
+	if (is_ratp_enable()) {
+		if (start_cpu == rd->min_cap_orig_cpu) {
+			if (is_gmod_enable() && prefer_top(p))
+				start_cpu = rd->mid_cap_orig_cpu == -1 ?
+					rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
+			else {
+				if (!(im_rendering(p) && prefer_sched_group(p)) &&
+						!(is_gmod_enable() && prefer_top(p))) {
+					start_bit = (rd->mid_cap_orig_cpu == -1) ?
+							rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
+					mask_big_cores(start_bit, p);
+				}
+			}
+		} else {
+			if (!(im_rendering(p) && prefer_sched_group(p)) && !(is_gmod_enable() && prefer_top(p))) {
+				start_bit = (rd->mid_cap_orig_cpu == -1) ? rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
+				mask_big_cores(start_bit, p);
+				start_cpu = rd->min_cap_orig_cpu;
+			}
+		}
+	}
+
+	trace_sched_cpu_sel(p,
+			task_boost,
+			task_skip_min,
+			boosted,
+			task_boost_policy(p),
+			task_demand_fits(p, rd->min_cap_orig_cpu),
+			task_demand_fits(p, (rd->mid_cap_orig_cpu == -1) ? rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu),
+			task_demand_fits(p, rd->max_cap_orig_cpu),
+			start_cpu, is_ratp_enable());
+
+#endif
 #ifdef CONFIG_TPD
 	if ((is_dynamic_tpd_task(p) || is_tpd_task(p)) && is_tpd_enable()) {
 		start_cpu = tpd_suggested_cpu(p, start_cpu);
@@ -7247,6 +7302,12 @@ static int start_cpu(struct task_struct *p, bool boosted,
 #endif
 #ifdef CONFIG_OPCHAIN
 	bool is_uxtop = is_opc_task(p, UT_FORE);
+#endif
+#ifdef CONFIG_RATP
+	struct cpumask new_mask = CPU_MASK_ALL;
+	int start_bit;
+
+	cpumask_copy(&p->cpus_suggested, &new_mask);
 #endif
 #if defined(CONFIG_HOUSTON) && defined(CONFIG_OPCHAIN)
 	if (is_uxtop && current->ravg.demand >= p->ravg.demand) {
@@ -7270,6 +7331,22 @@ static int start_cpu(struct task_struct *p, bool boosted,
 			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
 		return start_cpu;
 	}
+#endif
+
+#ifdef CONFIG_RATP
+		if (is_ratp_enable()) {
+			if ((im_rendering(p) && prefer_sched_group(p)) ||
+					(is_gmod_enable() && prefer_top(p))) {
+				start_cpu = rd->mid_cap_orig_cpu == -1 ?
+					rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
+			}
+		} else {
+			start_cpu = rd->mid_cap_orig_cpu == -1 ?
+				rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
+		}
+#else
+		start_cpu = rd->mid_cap_orig_cpu == -1 ?
+			rd->max_cap_orig_cpu : rd->mid_cap_orig_cpu;
 #endif
 
 	return walt_start_cpu(start_cpu);
@@ -7324,6 +7401,11 @@ static inline int find_best_target(struct task_struct *p, int *backup_cpu,
 	/* Scan CPUs in all SDs */
 	sg = sd->groups;
 	cpumask_copy(&new_allowed_cpus, &p->cpus_allowed);
+#ifdef CONFIG_RATP
+		if (is_ratp_enable() &&
+				!(im_rendering(p) && prefer_sched_group(p)) && !(is_gmod_enable() && prefer_top(p)))
+			cpumask_copy(&new_allowed_cpus, &p->cpus_suggested);
+#endif
 #ifdef CONFIG_TPD
 	if (is_tpd_enable() && is_tpd_task(p)) {
 		tpd_mask(p, &new_allowed_cpus);
@@ -7733,6 +7815,15 @@ bias_to_waker_cpu(struct task_struct *p, int cpu, struct cpumask *rtg_target)
 	       cpu_active(cpu) && !cpu_isolated(cpu) &&
 	       capacity_orig_of(cpu) >= capacity_orig_of(rtg_target_cpu) &&
 	       task_fits_max(p, cpu);
+
+#ifdef CONFIG_RATP
+	if (is_ratp_enable() &&
+			(!(im_rendering(p) && prefer_sched_group(p)) ||
+			(!(is_gmod_enable() && prefer_top(p)))))
+		base_test = cpumask_test_cpu(cpu, &p->cpus_suggested) &&
+				cpu_active(cpu);
+#endif
+
 }
 
 #define SCHED_SELECT_PREV_CPU_NSEC	2000000
@@ -8823,7 +8914,9 @@ static inline int migrate_degrades_locality(struct task_struct *p,
 	return -1;
 }
 #endif
-
+#ifdef CONFIG_RATP
+	struct root_domain *rd = cpu_rq(smp_processor_id())->rd;
+#endif
 #ifdef CONFIG_TPD
 static inline bool can_migrate_tpd_task(struct task_struct *p,
 		int src_cpu, int dst_cpu)
@@ -8837,7 +8930,17 @@ static inline bool can_migrate_tpd_task(struct task_struct *p,
 	return true;
 }
 #endif
+#ifdef CONFIG_RATP
+	if (is_ratp_enable()) {
+		if (im_rendering(p) && prefer_sched_group(p) &&
+				(capacity_orig_of(dst_cpu) < capacity_orig_of(src_cpu)) &&
+				(capacity_orig_of(dst_cpu) == capacity_orig_of(rd->min_cap_orig_cpu)))
+			return false;
 
+		if (!cpumask_test_cpu(dst_cpu, &p->cpus_suggested))
+			return false;
+	}
+#endif
 /*
  * can_migrate_task - may task p from runqueue rq be migrated to this_cpu?
  */
