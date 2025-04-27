@@ -773,11 +773,10 @@ TRACE_EVENT(sched_energy_diff,
 
 	TP_PROTO(struct task_struct *p, int prev_cpu, unsigned int prev_energy,
 		 int next_cpu, unsigned int next_energy,
-		 int backup_cpu, unsigned int backup_energy, unsigned long best_energy,
-		unsigned long best_energy_cpu),
+		 int backup_cpu, unsigned int backup_energy),
 
 	TP_ARGS(p, prev_cpu, prev_energy, next_cpu, next_energy,
-		backup_cpu, backup_energy, best_energy, best_energy_cpu),
+		backup_cpu, backup_energy),
 
 	TP_STRUCT__entry(
 		__field(int, pid		)
@@ -787,8 +786,6 @@ TRACE_EVENT(sched_energy_diff,
 		__field(int, next_energy	)
 		__field(int, backup_cpu		)
 		__field(int, backup_energy	)
-		__field(int,		best_energy_cpu)
-		__field(unsigned long,	best_energy)
 	),
 
 	TP_fast_assign(
@@ -799,15 +796,12 @@ TRACE_EVENT(sched_energy_diff,
 		__entry->next_energy		= next_energy;
 		__entry->backup_cpu		= backup_cpu;
 		__entry->backup_energy		= backup_energy;
-		__entry->best_energy_cpu	= best_energy_cpu;
-		__entry->best_energy	        = best_energy;
 	),
 
-	TP_printk("pid=%d prev_cpu=%d prev_energy=%u next_cpu=%d next_energy=%u backup_cpu=%d backup_energy=%u best_energy_cpu=%d best_energy=%llu",
+	TP_printk("pid=%d prev_cpu=%d prev_energy=%u next_cpu=%d next_energy=%u backup_cpu=%d backup_energy=%u",
 		__entry->pid, __entry->prev_cpu, __entry->prev_energy,
 		__entry->next_cpu, __entry->next_energy,
-		__entry->backup_cpu, __entry->backup_energy,
-		__entry->best_energy_cpu, __entry->best_energy)
+		__entry->backup_cpu, __entry->backup_energy)
 );
 
 TRACE_EVENT(sched_task_util,
