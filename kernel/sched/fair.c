@@ -6292,6 +6292,7 @@ int calc_total_energy(struct energy_env *eenv, struct sched_domain *sd,
  */
 static inline int select_energy_cpu_idx(struct energy_env *eenv)
 {
+	int best_energy_cpu = prev_cpu;
 	struct sched_domain *sd;
 	struct perf_domain *pd;
 	int sd_cpu = -1;
