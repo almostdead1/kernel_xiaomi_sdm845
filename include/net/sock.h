@@ -421,6 +421,7 @@ struct sock {
 				sk_no_check_tx : 1,
 				sk_no_check_rx : 1,
 				sk_userlocks : 4,
+	u8			sk_pacing_shift;
 				sk_protocol  : 8,
 				sk_type      : 16;
 #define SK_PROTOCOL_MAX U8_MAX

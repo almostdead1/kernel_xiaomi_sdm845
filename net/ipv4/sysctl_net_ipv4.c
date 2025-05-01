@@ -602,7 +602,7 @@ static struct ctl_table ipv4_table[] = {
 	},
 	{
 		.procname	= "tcp_min_tso_segs",
-		.data		= &sysctl_tcp_min_tso_segs,
+		.data		= &init_net.ipv4.sysctl_tcp_min_tso_segs,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
